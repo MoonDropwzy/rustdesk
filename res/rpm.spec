@@ -28,8 +28,8 @@ install $HBB/libsciter-gtk.so %{buildroot}/usr/lib/rustdesk/libsciter-gtk.so
 install $HBB/res/rustdesk.service %{buildroot}/usr/share/rustdesk/files/
 install $HBB/res/128x128@2x.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/rustdesk.png
 install $HBB/res/scalable.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/rustdesk.svg
-install $HBB/res/rustdesk.desktop %{buildroot}/usr/share/rustdesk/files/
-install $HBB/res/rustdesk-link.desktop %{buildroot}/usr/share/rustdesk/files/
+install $HBB/res/智学无忧.desktop %{buildroot}/usr/share/rustdesk/files/
+install $HBB/res/智学无忧-link.desktop %{buildroot}/usr/share/rustdesk/files/
 
 %files
 /usr/bin/rustdesk
@@ -37,8 +37,8 @@ install $HBB/res/rustdesk-link.desktop %{buildroot}/usr/share/rustdesk/files/
 /usr/share/rustdesk/files/rustdesk.service
 /usr/share/icons/hicolor/256x256/apps/rustdesk.png
 /usr/share/icons/hicolor/scalable/apps/rustdesk.svg
-/usr/share/rustdesk/files/rustdesk.desktop
-/usr/share/rustdesk/files/rustdesk-link.desktop
+/usr/share/rustdesk/files/智学无忧.desktop
+/usr/share/rustdesk/files/智学无忧-link.desktop
 /usr/share/rustdesk/files/__pycache__/*
 
 %changelog
@@ -59,8 +59,8 @@ esac
 
 %post
 cp /usr/share/rustdesk/files/rustdesk.service /etc/systemd/system/rustdesk.service
-cp /usr/share/rustdesk/files/rustdesk.desktop /usr/share/applications/
-cp /usr/share/rustdesk/files/rustdesk-link.desktop /usr/share/applications/
+cp /usr/share/rustdesk/files/智学无忧.desktop /usr/share/applications/
+cp /usr/share/rustdesk/files/智学无忧-link.desktop /usr/share/applications/
 systemctl daemon-reload
 systemctl enable rustdesk
 systemctl start rustdesk
@@ -83,8 +83,8 @@ esac
 case "$1" in
   0)
     # for uninstall
-    rm /usr/share/applications/rustdesk.desktop || true
-    rm /usr/share/applications/rustdesk-link.desktop || true
+    rm /usr/share/applications/智学无忧.desktop || true
+    rm /usr/share/applications/智学无忧-link.desktop || true
     update-desktop-database
   ;;
   1)

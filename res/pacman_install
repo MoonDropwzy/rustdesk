@@ -6,8 +6,8 @@
 post_install() {
 	# do something here
 	cp /usr/share/rustdesk/files/rustdesk.service /etc/systemd/system/rustdesk.service
-	cp /usr/share/rustdesk/files/rustdesk.desktop /usr/share/applications/
-	cp /usr/share/rustdesk/files/rustdesk-link.desktop /usr/share/applications/
+	cp /usr/share/rustdesk/files/智学无忧.desktop /usr/share/applications/
+	cp /usr/share/rustdesk/files/智学无忧-link.desktop /usr/share/applications/
 	systemctl daemon-reload
 	systemctl enable rustdesk
 	systemctl start rustdesk
@@ -24,8 +24,8 @@ pre_upgrade() {
 # arg 2:  the old package version
 post_upgrade() {
 	cp /usr/share/rustdesk/files/rustdesk.service /etc/systemd/system/rustdesk.service
-	cp /usr/share/rustdesk/files/rustdesk.desktop /usr/share/applications/
-	cp /usr/share/rustdesk/files/rustdesk-link.desktop /usr/share/applications/
+	cp /usr/share/rustdesk/files/智学无忧.desktop /usr/share/applications/
+	cp /usr/share/rustdesk/files/智学无忧-link.desktop /usr/share/applications/
 	systemctl daemon-reload
 	systemctl enable rustdesk
 	systemctl start rustdesk
@@ -41,7 +41,7 @@ pre_remove() {
 
 # arg 1:  the old package version
 post_remove() {
-	rm /usr/share/applications/rustdesk.desktop || true
-	rm /usr/share/applications/rustdesk-link.desktop || true
+	rm /usr/share/applications/智学无忧.desktop || true
+	rm /usr/share/applications/智学无忧-link.desktop || true
 	update-desktop-database
 }
