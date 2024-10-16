@@ -1,5 +1,5 @@
 [Unit]
-Description=RustDesk
+Description=智学无忧
 Requires=network.target
 After=systemd-user-sessions.service
 
