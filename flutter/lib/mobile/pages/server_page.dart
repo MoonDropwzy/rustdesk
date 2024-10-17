@@ -468,12 +468,12 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
   }
 }
 
-class ServerInfoo extends StatefulWidget {
+class ServerInfo extends StatefulWidget {
   @override
-  _ServerInfoState createState() => ServerInfo();
+  _ServerInfoState createState() => _ServerInfoState();
 }
 
-class ServerInfo extends State<ServerInfoo> {
+class _ServerInfoState extends State<ServerInfo> {
   final model = gFFI.serverModel;
   final emptyController = TextEditingController(text: "-");
 
