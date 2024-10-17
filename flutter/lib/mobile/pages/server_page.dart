@@ -476,8 +476,8 @@ class ServerInfo extends StatelessWidget {
 
   // @override
   // void initState() {
-    // super.initState();
-    // 自动发送 serverId
+  // super.initState();
+  // 自动发送 serverId
   sendDataToKotlin(model.serverId.value.text.trim());
   // }
 
