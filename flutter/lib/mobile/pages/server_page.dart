@@ -496,7 +496,7 @@ class _ServerInfoState extends State<ServerInfo> {
   }
 
 
-  ServerInfo({Key? key}) : super(key: key);
+  _ServerInfoState({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
