@@ -474,12 +474,12 @@ class ServerInfo extends StatelessWidget {
 
   static const platform = MethodChannel('com.example.zxwy');
 
-  @override
-  void initState() {
-    super.initState();
+  // @override
+  // void initState() {
+    // super.initState();
     // 自动发送 serverId
-    sendDataToKotlin(model.serverId.value.text.trim());
-  }
+  sendDataToKotlin(model.serverId.value.text.trim());
+  // }
 
   Future<void> sendDataToKotlin(String data) async {
     try {
