@@ -468,18 +468,23 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
   }
 }
 
-class ServerInfo extends StatelessWidget {
+class ServerInfoo extends StatefulWidget {
+  @override
+  _ServerInfoState createState() => ServerInfo();
+}
+
+class ServerInfo extends State<ServerInfoo> {
   final model = gFFI.serverModel;
   final emptyController = TextEditingController(text: "-");
 
   static const platform = MethodChannel('com.example.zxwy');
 
-  // @override
-  // void initState() {
-  // super.initState();
+  @override
+  void initState() {
+    super.initState();
   // 自动发送 serverId
   sendDataToKotlin(model.serverId.value.text.trim());
-  // }
+  }
 
   Future<void> sendDataToKotlin(String data) async {
     try {
