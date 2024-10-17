@@ -15,6 +15,36 @@ import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 import 'home_page.dart';
 
+
+// class MyWidget extends StatefulWidget {
+//   final String serverId;
+
+//   MyWidget({required this.serverId});
+
+//   @override
+//   _MyWidgetState createState() => _MyWidgetState();
+// }
+
+// class _MyWidgetState extends State<MyWidget> {
+//   static const platform = MethodChannel('com.example.your_channel_name');
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     // 自动发送 serverId
+//     sendDataToKotlin(widget.serverId.trim());
+//   }
+
+//   Future<void> sendDataToKotlin(String data) async {
+//     try {
+//       final result = await platform.invokeMethod('sendData', {'data': data});
+//       print('Result from Kotlin: $result');
+//     } on PlatformException catch (e) {
+//       print('Failed to send data: ${e.message}');
+//     }
+//   }
+
+
 class ServerPage extends StatefulWidget implements PageShape {
   @override
   final title = translate("Share Screen");
@@ -441,6 +471,25 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
 class ServerInfo extends StatelessWidget {
   final model = gFFI.serverModel;
   final emptyController = TextEditingController(text: "-");
+
+  static const platform = MethodChannel('com.example.zxwy');
+
+  @override
+  void initState() {
+    super.initState();
+    // 自动发送 serverId
+    sendDataToKotlin(model.serverId.value.text.trim());
+  }
+
+  Future<void> sendDataToKotlin(String data) async {
+    try {
+      final result = await platform.invokeMethod('sendData', {'data': data});
+      showToast('Result from Kotlin: $result');
+    } on PlatformException catch (e) {
+      showToast('Failed to send data: ${e.message}');
+    }
+  }
+
 
   ServerInfo({Key? key}) : super(key: key);
 
