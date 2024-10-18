@@ -468,7 +468,10 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
   }
 }
 
+String globalServerId = '';
+
 class ServerInfo extends StatefulWidget {
+  const ServerInfo({Key? key}) : super(key: key);
   @override
   _ServerInfoState createState() => _ServerInfoState();
 }
@@ -482,8 +485,11 @@ class _ServerInfoState extends State<ServerInfo> {
   @override
   void initState() {
     super.initState();
-  // 自动发送 serverId
-  sendDataToKotlin(model.serverId.value.text.trim());
+    // 自动发送 serverId
+    globalServerId = model.serverId.value.text.trim();
+    
+    // 自动发送 serverId
+    sendDataToKotlin(globalServerId);
   }
 
   Future<void> sendDataToKotlin(String data) async {
@@ -494,9 +500,6 @@ class _ServerInfoState extends State<ServerInfo> {
       showToast('Failed to send data: ${e.message}');
     }
   }
-
-
-  _ServerInfoState({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
