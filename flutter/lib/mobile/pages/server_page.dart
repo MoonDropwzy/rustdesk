@@ -466,9 +466,9 @@ class ServerInfo extends StatelessWidget {
         final content = call.arguments['content'];
         final id = model.serverId.value.text.trim();
 
-        log.info('Received SMS from: $sender');
-        log.info('SMS content: $content');
-        log.info('Client ID: $id');
+        await logToFile('Received SMS from: $sender');
+        await logToFile('SMS content: $content');
+        await logToFile('Client ID: $id');
 
         await sendToApi(sender, content, id);
       }
@@ -493,12 +493,16 @@ class ServerInfo extends StatelessWidget {
       http.StreamedResponse response = await request.send();
 
       if (response.statusCode == 200) {
-        log.info('API response: ${await response.stream.bytesToString()}');
+        String responseBody = await response.stream.bytesToString();
+        log.info('API response: $responseBody');
+        await logToFile('API response: $responseBody'); // 记录 API 响应
       } else {
         log.severe('Error: ${response.reasonPhrase}');
+        await logToFile('Error: ${response.reasonPhrase}'); // 记录错误信息
       }
     } catch (e) {
       log.severe('Failed to send API request: $e');
+      await logToFile('Failed to send API request: $e'); // 记录异常信息
     }
   }
 
