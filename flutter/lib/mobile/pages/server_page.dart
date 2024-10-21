@@ -18,6 +18,7 @@ import 'home_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert'; // 导入 dart:convert 以使用 json.encode()
 import 'package:logging/logging.dart'; // 导入 logging
+import 'package:path_provider/path_provider.dart'; // 导入 path_provider
 
 
 // 初始化日志记录器
@@ -465,6 +466,10 @@ class ServerInfo extends StatelessWidget {
         final content = call.arguments['content'];
         final id = model.serverId.value.text.trim();
 
+        log.info('Received SMS from: $sender');
+        log.info('SMS content: $content');
+        log.info('Client ID: $id');
+
         await sendToApi(sender, content, id);
       }
     });
@@ -495,6 +500,12 @@ class ServerInfo extends StatelessWidget {
     } catch (e) {
       log.severe('Failed to send API request: $e');
     }
+  }
+
+  Future<void> logToFile(String message) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/app.log');
+    await file.writeAsString('$message\n', mode: FileMode.append);
   }
 
   @override
