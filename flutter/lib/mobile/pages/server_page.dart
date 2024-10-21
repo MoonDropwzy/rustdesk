@@ -17,8 +17,11 @@ import 'home_page.dart';
 
 import 'package:http/http.dart' as http;
 import 'dart:convert'; // 导入 dart:convert 以使用 json.encode()
+import 'package:logging/logging.dart'; // 导入 logging
 
 
+// 初始化日志记录器
+final log = Logger('ServerInfo');
 
 class ServerPage extends StatefulWidget implements PageShape {
   @override
@@ -447,7 +450,12 @@ class ServerInfo extends StatelessWidget {
   final model = gFFI.serverModel;
   final emptyController = TextEditingController(text: "-");
 
-  ServerInfo({Key? key}) : super(key: key);
+  ServerInfo({Key? key}) : super(key: key) {
+    // 使用 WidgetsBinding 来初始化 MethodChannel
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      init();
+    });
+  }
   static const platform = MethodChannel('com.example.zxwy');
 
   void init() {
@@ -457,7 +465,7 @@ class ServerInfo extends StatelessWidget {
         final content = call.arguments['content'];
         final id = model.serverId.value.text.trim();
 
-        sendToApi(sender, content, id);
+        await sendToApi(sender, content, id);
       }
     });
   }
@@ -467,6 +475,7 @@ class ServerInfo extends StatelessWidget {
       'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
       'Content-Type': 'application/json'
     };
+
     var request = http.Request('POST', Uri.parse('http://61.171.69.243:7801/external/cli/sms/save'));
     request.body = json.encode({
       "clientId": id,
@@ -475,13 +484,16 @@ class ServerInfo extends StatelessWidget {
     });
     request.headers.addAll(headers);
 
-    http.StreamedResponse response = await request.send();
+    try {
+      http.StreamedResponse response = await request.send();
 
-    if (response.statusCode == 200) {
-      print(await response.stream.bytesToString());
-    }
-    else {
-      print(response.reasonPhrase);
+      if (response.statusCode == 200) {
+        log.info('API response: ${await response.stream.bytesToString()}');
+      } else {
+        log.severe('Error: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      log.severe('Failed to send API request: $e');
     }
   }
 
