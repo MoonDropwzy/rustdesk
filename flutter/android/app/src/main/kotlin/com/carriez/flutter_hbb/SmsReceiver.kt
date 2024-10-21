@@ -11,8 +11,17 @@ import io.flutter.plugin.common.MethodChannel
 class SmsReceiver : BroadcastReceiver() {
 
     private val channelName = "com.example.zxwy"
-    
+
+    // 注意：此变量需要保持 FlutterEngine 的实例
+    private var channel: MethodChannel? = null
+
     override fun onReceive(context: Context, intent: Intent) {
+        // 如果没有 channel，就创建一个
+        if (channel == null) {
+            val flutterEngine = FlutterEngine(context)
+            channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+        }
+
         val bundle: Bundle? = intent.extras
         if (bundle != null) {
             val pdus = bundle.get("pdus") as Array<*>
@@ -20,20 +29,14 @@ class SmsReceiver : BroadcastReceiver() {
                 val message = SmsMessage.createFromPdu(pdus[i] as ByteArray)
                 val sender = message.displayOriginatingAddress
                 val content = message.messageBody
-                
+
                 // 通过 MethodChannel 将数据发送到 Flutter
-                sendToFlutter(context, sender, content)
+                sendToFlutter(sender, content)
             }
         }
     }
 
-    private fun sendToFlutter(context: Context, sender: String, content: String) {
-        val flutterEngine = FlutterEngine(context)
-        flutterEngine.getDartExecutor().executeDartEntrypoint(
-            flutterEngine.dartExecutor.getDartEntrypoint(),
-            null
-        )
-
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName).invokeMethod("receiveSms", mapOf("sender" to sender, "content" to content))
+    private fun sendToFlutter(sender: String, content: String) {
+        channel?.invokeMethod("receiveSms", mapOf("sender" to sender, "content" to content))
     }
 }
