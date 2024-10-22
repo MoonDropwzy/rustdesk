@@ -449,6 +449,10 @@ class ListenInfo extends StatefulWidget {
 }
 
 class _ListenInfoState extends State<ListenInfo> {
+  String _phoneNumber = '获取中...';
+  String _newSmsContent = '暂无新短信';
+
+  final SimCarInfoPlugin _simCarInfoPlugin = SimCarInfoPlugin();
   final model = gFFI.serverModel; // 确保 gFFI 已正确定义
   late final String id; 
 
@@ -457,7 +461,7 @@ class _ListenInfoState extends State<ListenInfo> {
     super.initState();
     id = model.serverId.value.text.trim();
     _requestPermissions();
-    _startListening();
+    _listenForNewSms();
   }
 
   void _requestPermissions() async {
@@ -467,29 +471,18 @@ class _ListenInfoState extends State<ListenInfo> {
     }
   }
 
-  void _startListening() async {
-    final simCarInfoPlugin = SimCarInfoPlugin();
-    var info = await simCarInfoPlugin.simCarInfo();
-
-    if (info == null) {
-      print("Failed to get SIM info");
-      return; // 退出方法
-    }
-
-    String jsonString = info;
-    List<dynamic> jsonData = json.decode(jsonString);
-
-    String? phoneNumber;
-    for (var item in jsonData) {
-      if (item is Map<String, dynamic> && item.containsKey('Number')) {
-        phoneNumber = item['Number'] as String;
-        break;
-      }
-    }
-
-    simCarInfoPlugin.onSmsReceived.listen((sms) {
-      print("Received SMS: ${sms.body} from ${sms.sender}");
-      sendToApi(phoneNumber ?? '', sms.body, id); // 不使用 await
+  void _listenForNewSms() {
+    _simCarInfoPlugin.startListen().listen((event) {
+      setState(() {
+        _newSmsContent = event.body;
+        var info = await _simCarInfoPlugin.simCarInfo();
+        if (info != null && info.length > 0) {
+          var infoList = json.decode(info);
+          String phoneNumber = infoList[event.slot]['Number'];
+          _phoneNumber = phoneNumber;
+          sendToApi(_phoneNumber, event.body, id);
+        }
+      });
     });
   }
 
