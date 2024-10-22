@@ -416,7 +416,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     if (isDesktop) return;
 
     // Don't use `MediaQuery.of(context).orientation` in `didChangeMetrics()`,
-    // my test (Flutter 3.24.3, Android 14) is always the reverse value.
+    // my test (Flutter 3.22.3, Android 14) is always the reverse value.
     // https://github.com/flutter/flutter/issues/60899
     // stateGlobal.isPortrait.value =
     //     MediaQuery.of(context).orientation == Orientation.portrait;
