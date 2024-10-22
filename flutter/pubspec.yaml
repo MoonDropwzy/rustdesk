@@ -110,7 +110,6 @@ dependencies:
   extended_text: 13.0.0
 
 dev_dependencies:
-  analyzer: ^6.11.0
   icons_launcher: ^2.0.4
   #flutter_test:
   #sdk: flutter
