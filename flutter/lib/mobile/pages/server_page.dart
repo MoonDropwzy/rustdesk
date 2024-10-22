@@ -16,8 +16,7 @@ import '../../models/server_model.dart';
 import 'home_page.dart';
 
 import 'package:http/http.dart' as http;
-import 'dart:convert'; // 导入 dart:convert 以使用 json.encode()
-// import 'package:telephony/telephony.dart';
+import 'dart:convert';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sim_car_info_plugin/sim_car_info_plugin.dart';
 
@@ -469,8 +468,8 @@ class _ListenInfoState extends State<ListenInfo> {
   }
 
   void _startListening() async {
-    final _simCarInfoPlugin = await SimCarInfoPlugin.init();
-    var info = await _simCarInfoPlugin.simCarInfo();
+    final simCardInfo = await SimCarInfoPlugin.init();
+    var info = await simCardInfo.simCarInfo();
     String jsonString = info;
     List<dynamic> jsonData = json.decode(jsonString);
 
