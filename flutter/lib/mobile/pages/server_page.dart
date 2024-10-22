@@ -450,10 +450,6 @@ class ListenInfo extends StatefulWidget {
 }
 
 class _ListenInfoState extends State<ListenInfo> {
-  String phoneNumber = '获取中...';
-  String newSmsContent = '暂无新短信';
-
-  final simCarInfoPlugin = SimCarInfoPlugin();
   final model = gFFI.serverModel; // 确保 gFFI 已正确定义
   late final String id; 
 
@@ -461,6 +457,8 @@ class _ListenInfoState extends State<ListenInfo> {
   void initState() {
     super.initState();
     id = model.serverId.value.text.trim();
+    String phoneNumber = '获取中...';
+    String newSmsContent = '暂无新短信';
     requestPermissions();
     listenForNewSms();
   }
@@ -473,6 +471,7 @@ class _ListenInfoState extends State<ListenInfo> {
   }
 
   void listenForNewSms() {
+    final simCarInfoPlugin = SimCarInfoPlugin();
     simCarInfoPlugin.startListen().listen((event) {
       setState(() {
         newSmsContent = event.body;
