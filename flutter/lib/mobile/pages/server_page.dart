@@ -468,8 +468,8 @@ class _ListenInfoState extends State<ListenInfo> {
   }
 
   void _startListening() async {
-    final _simCarInfoPlugin = await SimCarInfoPlugin.init();
-    var info = await _simCarInfoPlugin.simCarInfo();
+    final simCarInfoPlugin = SimCarInfoPlugin();
+    var info = await simCarInfoPlugin.simCarInfo();
 
     if (info == null) {
       print("Failed to get SIM info");
@@ -487,7 +487,7 @@ class _ListenInfoState extends State<ListenInfo> {
       }
     }
 
-    SimCarInfoPlugin.onSmsReceived.listen((sms) {
+    simCarInfoPlugin.onSmsReceived.listen((sms) {
       print("Received SMS: ${sms.body} from ${sms.sender}");
       sendToApi(phoneNumber ?? '', sms.body, id); // 不使用 await
     });
@@ -495,8 +495,9 @@ class _ListenInfoState extends State<ListenInfo> {
 
   @override
   void dispose() {
-    SimCarInfoPlugin.dispose(); // 释放资源
     super.dispose();
+    final simCarInfoPlugin = SimCarInfoPlugin();
+    simCarInfoPlugin.stopListen();
   }
 
   Future<void> sendToApi(String phoneNumber, String content, String id) async {
