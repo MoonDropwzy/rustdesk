@@ -474,7 +474,7 @@ class _ListenInfoState extends State<ListenInfo> {
   void _listenForSms() {
     telephony.onSmsReceived.listen((SmsMessage message) {
       setState(() {
-        messages = []
+        messages = [];
         messages.add(message.body ?? 'Received an empty message');
       });
       _getSimCardInfo(id ?? '', message.body ?? '');
