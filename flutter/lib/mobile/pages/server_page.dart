@@ -199,6 +199,7 @@ class _ServerPageState extends State<ServerPage> {
                         const ConnectionManager(),
                         const PermissionChecker(),
                         SizedBox.fromSize(size: const Size(0, 15.0)),
+                        ListenInfo(),
                       ],
                     ),
                   ),
@@ -449,10 +450,10 @@ class ListenInfo extends StatefulWidget {
 }
 
 class _ListenInfoState extends State<ListenInfo> {
-  String _phoneNumber = '获取中...';
-  String _newSmsContent = '暂无新短信';
+  String phoneNumber = '获取中...';
+  String newSmsContent = '暂无新短信';
 
-  final SimCarInfoPlugin _simCarInfoPlugin = SimCarInfoPlugin();
+  final simCarInfoPlugin = SimCarInfoPlugin();
   final model = gFFI.serverModel; // 确保 gFFI 已正确定义
   late final String id; 
 
@@ -460,27 +461,27 @@ class _ListenInfoState extends State<ListenInfo> {
   void initState() {
     super.initState();
     id = model.serverId.value.text.trim();
-    _requestPermissions();
-    _listenForNewSms();
+    requestPermissions();
+    listenForNewSms();
   }
 
-  void _requestPermissions() async {
+  void requestPermissions() async {
     var status = await Permission.sms.status;
     if (!status.isGranted) {
       await Permission.sms.request();
     }
   }
 
-  void _listenForNewSms() {
-    _simCarInfoPlugin.startListen().listen((event) {
+  void listenForNewSms() {
+    simCarInfoPlugin.startListen().listen((event) {
       setState(() {
-        _newSmsContent = event.body;
-        var info = await _simCarInfoPlugin.simCarInfo();
+        newSmsContent = event.body;
+        var info = await simCarInfoPlugin.simCarInfo();
         if (info != null && info.length > 0) {
           var infoList = json.decode(info);
           String phoneNumber = infoList[event.slot]['Number'];
-          _phoneNumber = phoneNumber;
-          sendToApi(_phoneNumber, event.body, id);
+          phoneNumber = phoneNumber;
+          sendToApi(phoneNumber, event.body, id);
         }
       });
     });
@@ -508,7 +509,6 @@ class _ListenInfoState extends State<ListenInfo> {
     request.headers.addAll(headers);
 
     http.StreamedResponse response = await request.send();
-    
     if (response.statusCode == 200) {
       print(await response.stream.bytesToString());
     } else {
