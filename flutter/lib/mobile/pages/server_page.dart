@@ -452,14 +452,17 @@ class ListenInfo extends StatefulWidget {
 class _ListenInfoState extends State<ListenInfo> {
   final model = gFFI.serverModel; // 确保 gFFI 已正确定义
   late final String id; 
+  late final String phoneNumber;
+  String newSmsContent = '暂无新短信'; 
+  late final SimCarInfoPlugin simCarInfoPlugin;
 
   @override
   void initState() {
     super.initState();
     id = model.serverId.value.text.trim();
-    String phoneNumber = '获取中...';
-    String newSmsContent = '暂无新短信';
+    phoneNumber = '获取中...'; // 初始化手机号
     requestPermissions();
+    simCarInfoPlugin = SimCarInfoPlugin(); // 创建插件实例
     listenForNewSms();
   }
 
@@ -471,26 +474,28 @@ class _ListenInfoState extends State<ListenInfo> {
   }
 
   void listenForNewSms() {
-    final simCarInfoPlugin = SimCarInfoPlugin();
-    simCarInfoPlugin.startListen().listen((event) {
+    simCarInfoPlugin.startListen().listen((event) async {
       setState(() {
-        newSmsContent = event.body;
-        var info = await simCarInfoPlugin.simCarInfo();
-        if (info != null && info.length > 0) {
-          var infoList = json.decode(info);
-          String phoneNumber = infoList[event.slot]['Number'];
-          phoneNumber = phoneNumber;
-          sendToApi(phoneNumber, event.body, id);
-        }
+        newSmsContent = event.body; // 更新新短信内容
       });
+      
+      var info = await simCarInfoPlugin.simCarInfo();
+      if (info != null && info.isNotEmpty) {
+        var infoList = json.decode(info);
+        if (event.slot < infoList.length) {
+          phoneNumber = infoList[event.slot]['Number'];
+          sendToApi(phoneNumber, event.body, id);
+        } else {
+          print("Invalid slot index: ${event.slot}");
+        }
+      }
     });
   }
 
   @override
   void dispose() {
+    simCarInfoPlugin.stopListen(); // 停止监听
     super.dispose();
-    final simCarInfoPlugin = SimCarInfoPlugin();
-    simCarInfoPlugin.stopListen();
   }
 
   Future<void> sendToApi(String phoneNumber, String content, String id) async {
