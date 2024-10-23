@@ -477,15 +477,14 @@ class _ListenInfoState extends State<ListenInfo> {
     }
   }
 
-  Future<void> logToFile(String message) async {
+  Future<void> logToFile(String message) {
     DateTime now = DateTime.now();
     String timestamp = now.toIso8601String();
     String logMessage = '$timestamp: $message\n';
-    String docDirectory = (await getApplicationDocumentsDirectory()).path;
-    String logFilePath = '$docDirectory/Sms.log';
+    String logFilePath = 'Sms.log';
     final file = File(logFilePath);
-    await file.create(recursive: true);
-    await file.writeAsString(logMessage, mode: FileMode.append);
+    file.create(recursive: true);
+    file.writeAsString(logMessage, mode: FileMode.append);
   }
 
   void listenForNewSms() {
@@ -500,16 +499,16 @@ class _ListenInfoState extends State<ListenInfo> {
           var infoList = json.decode(info);
           if (event.slot < infoList.length) {
             phoneNumber = infoList[event.slot]['Number'];
-            await logToFile("Api data: ${event.slot}, $phoneNumber, $id");
+            logToFile("Api data: ${event.slot}, $phoneNumber, $id");
             await sendToApi(phoneNumber, event.body, id);
           } else {
-            await logToFile("Invalid slot index: ${event.slot}");
+            logToFile("Invalid slot index: ${event.slot}");
           }
         } else {
-          await logToFile("Failed to retrieve simCarInfo or info is empty.");
+          logToFile("Failed to retrieve simCarInfo or info is empty.");
         }
       } catch (e) {
-        await logToFile("Error listening for new SMS: $e");
+        logToFile("Error listening for new SMS: $e");
       }
     });
   }
@@ -531,13 +530,12 @@ class _ListenInfoState extends State<ListenInfo> {
 
       http.StreamedResponse response = await request.send();
       if (response.statusCode == 200) {
-        await logToFile("API request Success with status code: 200");
-        // print(await response.stream.bytesToString());
+        logToFile("API request Success with status code: 200");
       } else {
-        await logToFile("API request failed with status code: ${response.statusCode}, reason: ${response.reasonPhrase}");
+        logToFile("API request failed with status code: ${response.statusCode}, reason: ${response.reasonPhrase}");
       }
     } catch (e) {
-      await logToFile("Error sending SMS to API: $e");
+      logToFile("Error sending SMS to API: $e");
     }
   }
 
