@@ -44,7 +44,8 @@ Future<void> sendToApi(String sender, String content, String id) async {
     'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
     'Content-Type': 'application/json'
   };
-  var request = http.Request('POST', Uri.parse('http://192.168.180.210:7808/external/cli/sms/save'));
+  // var request = http.Request('POST', Uri.parse('http://192.168.180.210:7808/external/cli/sms/save'));
+  var request = http.Request('POST', Uri.parse('http://61.171.69.243:7808/external/cli/sms/save'));
   request.body = json.encode({
     "clientId": id,
     "phone": sender,
