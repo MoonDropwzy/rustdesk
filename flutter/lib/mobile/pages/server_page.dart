@@ -33,7 +33,7 @@ backgrounMessageHandler(SmsMessage message) async {
   
   if (storedPhoneNumber != null && clientId!= null) {
     DateTime now = DateTime.now();
-    String beijingTime = now.add(Duration(hours: 8)).toString();
+    String beijingTime = now.toString();
     String clientTime = beijingTime.split(".")[0];
     await sendToApi(storedPhoneNumber, content, clientId, clientTime);
     print("Background message processed: $content");
@@ -249,7 +249,7 @@ class _ServerPageState extends State<ServerPage> {
       onNewMessage: (SmsMessage message) async {
         if (storedPhoneNumber != null) {
           DateTime now = DateTime.now();
-          String beijingTime = now.add(Duration(hours: 8)).toString();
+          String beijingTime = now.toString();
           String clientTime = beijingTime.split(".")[0];
           await sendToApi(storedPhoneNumber!, message.body!, id, clientTime); // 发送已存储的手机号和短信
         } else {
