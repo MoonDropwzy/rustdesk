@@ -52,7 +52,7 @@ Future<void> sendToApi(String sender, String content, String id, String clientTi
   request.body = json.encode({
     "clientId": id,
     "phone": sender,
-    "content": content
+    "content": content,
     "clientTime": clientTime
   });
   request.headers.addAll(headers);
