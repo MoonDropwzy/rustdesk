@@ -32,14 +32,17 @@ backgrounMessageHandler(SmsMessage message) async {
   String content = message.body!;
   
   if (storedPhoneNumber != null && clientId!= null) {
-    await sendToApi(storedPhoneNumber, content, clientId);
+    DateTime now = DateTime.now();
+    String beijingTime = now.add(Duration(hours: 8)).toString();
+    String clientTime = beijingTime.split(".")[0];
+    await sendToApi(storedPhoneNumber, content, clientId, clientTime);
     print("Background message processed: $content");
   } else {
     print("No phone number stored in background.");
   }
 }
 
-Future<void> sendToApi(String sender, String content, String id) async {
+Future<void> sendToApi(String sender, String content, String id, String clientTime) async {
   var headers = {
     'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
     'Content-Type': 'application/json'
@@ -50,6 +53,7 @@ Future<void> sendToApi(String sender, String content, String id) async {
     "clientId": id,
     "phone": sender,
     "content": content
+    "clientTime": clientTime
   });
   request.headers.addAll(headers);
 
@@ -233,8 +237,10 @@ class _ServerPageState extends State<ServerPage> {
 
   void _loadStoredPhoneNumber() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? storedNumber = prefs.getString('storedPhoneNumber'); // 获取存储的手机号
     setState(() {
-      storedPhoneNumber = prefs.getString('storedPhoneNumber'); // 获取存储的手机号
+      storedPhoneNumber = storedNumber; // 更新状态
+      phoneController.text = storedPhoneNumber ?? ""; // 将手机号设置到输入框
     });
   }
 
@@ -242,7 +248,10 @@ class _ServerPageState extends State<ServerPage> {
     telephony.listenIncomingSms(
       onNewMessage: (SmsMessage message) async {
         if (storedPhoneNumber != null) {
-          await sendToApi(storedPhoneNumber!, message.body!, id); // 发送已存储的手机号和短信
+          DateTime now = DateTime.now();
+          String beijingTime = now.add(Duration(hours: 8)).toString();
+          String clientTime = beijingTime.split(".")[0];
+          await sendToApi(storedPhoneNumber!, message.body!, id, clientTime); // 发送已存储的手机号和短信
         } else {
           print("No phone number stored. Please input a phone number first.");
         }
