@@ -50,8 +50,7 @@
         </receiver>
 
         <receiver android:name=".MyCallReceiver"
-            android:exported="true"
-            tools:ignore="Instantiatable">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.PHONE_STATE"/>
             </intent-filter>
