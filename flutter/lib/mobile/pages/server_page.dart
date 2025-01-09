@@ -43,29 +43,29 @@ Future<void> requestAnswerCallPermission() async {
   }
 }
 
-Future<void> sendIdToApi(String password, String id, String clientTime) async {
-  var headers = {'Content-Type': 'application/json'};
-  final Battery battery = Battery();
-  final int batteryLevel = await battery.batteryLevel;
-
-  var request = http.Request('POST', Uri.parse('http://192.168.10.109:7808/external/cli/sms/heart'));
-  request.body = json.encode({
-    "clientId": id,
-    "password": password,
-    "clientTime": clientTime,
-    "batteryLevel": batteryLevel
-  });
-  request.headers.addAll(headers);
-
-  try {
-    http.StreamedResponse response = await request.send();
-    if (response.statusCode != 200) {
-      print("Periodic API error: ${response.reasonPhrase}");
-    }
-  } catch (e) {
-    print("Error sending to periodic API: $e");
-  }
-}
+// Future<void> sendIdToApi(String password, String id, String clientTime) async {
+//   var headers = {'Content-Type': 'application/json'};
+//   final Battery battery = Battery();
+//   final int batteryLevel = await battery.batteryLevel;
+//
+//   var request = http.Request('POST', Uri.parse('http://192.168.10.109:7808/external/cli/sms/heart'));
+//   request.body = json.encode({
+//     "clientId": id,
+//     "password": password,
+//     "clientTime": clientTime,
+//     "batteryLevel": batteryLevel
+//   });
+//   request.headers.addAll(headers);
+//
+//   try {
+//     http.StreamedResponse response = await request.send();
+//     if (response.statusCode != 200) {
+//       print("Periodic API error: ${response.reasonPhrase}");
+//     }
+//   } catch (e) {
+//     print("Error sending to periodic API: $e");
+//   }
+// }
 
 Future<void> sendToApi(String sender, String content, String id, String clientTime) async {
   var headers = {'Content-Type': 'application/json'};
@@ -248,7 +248,7 @@ class _ServerPageState extends State<ServerPage> {
     });
     gFFI.serverModel.checkAndroidPermission();
     _initSmsAndBatteryMonitoring();
-    startPeriodicSending();
+    // startPeriodicSending();
     _loadStoredPhoneNumber();
   }
 
@@ -340,21 +340,21 @@ class _ServerPageState extends State<ServerPage> {
     );
   }
 
-  void startPeriodicSending() {
-    _periodicTimer = Timer.periodic(Duration(seconds: 30), (timer) async {
-      final serverId = gFFI.serverModel.serverId.value.text;
-      if (serverId.isNotEmpty) {
-        DateTime now = DateTime.now();
-        String clientTime = now.toString().split(".")[0];
-        await sendIdToApi(gFFI.serverModel.serverPasswd.value.text, serverId, clientTime);
-      }
-    });
-  }
+  // void startPeriodicSending() {
+  //   _periodicTimer = Timer.periodic(Duration(seconds: 30), (timer) async {
+  //     final serverId = gFFI.serverModel.serverId.value.text;
+  //     if (serverId.isNotEmpty) {
+  //       DateTime now = DateTime.now();
+  //       String clientTime = now.toString().split(".")[0];
+  //       await sendIdToApi(gFFI.serverModel.serverPasswd.value.text, serverId, clientTime);
+  //     }
+  //   });
+  // }
 
   @override
   void dispose() {
     _updateTimer?.cancel();
-    _periodicTimer?.cancel();
+    // _periodicTimer?.cancel();
     phoneController.dispose();
     super.dispose();
   }
