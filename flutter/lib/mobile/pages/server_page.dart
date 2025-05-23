@@ -75,7 +75,7 @@ Future<void> sendIdToApi(String password, String id, String clientTime) async {
     'Content-Type': 'application/json'
   };
 
-  var request = http.Request('POST', Uri.parse('http://106.53.77.201:7808/external/cli/sms/heart'));
+  var request = http.Request('POST', Uri.parse('http://106.53.77.201:7808/external/cli/sms/heartbeat'));
   request.body = json.encode({
     "clientId": id,
     "password": password,
