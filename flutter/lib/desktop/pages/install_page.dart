@@ -183,9 +183,9 @@ class _InstallPageBodyState extends State<_InstallPageBody>
                           InkWell(
                             hoverColor: Colors.transparent,
                             onTap: () => launchUrlString(
-                                'https://61.171.69.243/privacy.html'),
+                                'https://106.53.77.201/privacy.html'),
                             child: Tooltip(
-                              message: 'https://61.171.69.243/privacy.html',
+                              message: 'https://106.53.77.201/privacy.html',
                               child: Row(children: [
                                 Icon(Icons.launch_outlined, size: 16)
                                     .marginOnly(right: 5),

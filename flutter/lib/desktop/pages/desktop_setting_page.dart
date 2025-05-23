@@ -1909,7 +1909,7 @@ class _AboutState extends State<_About> {
                             .marginSymmetric(vertical: 4.0)),
                   InkWell(
                       onTap: () {
-                        launchUrlString('https://61.171.69.243/privacy.html');
+                        launchUrlString('https://106.53.77.201/privacy.html');
                       },
                       child: Text(
                         translate('Privacy Statement'),
@@ -1917,7 +1917,7 @@ class _AboutState extends State<_About> {
                       ).marginSymmetric(vertical: 4.0)),
                   InkWell(
                       onTap: () {
-                        launchUrlString('https://61.171.69.243');
+                        launchUrlString('https://106.53.77.201');
                       },
                       child: Text(
                         translate('Website'),

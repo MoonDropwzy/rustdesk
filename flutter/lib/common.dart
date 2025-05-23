@@ -3355,7 +3355,7 @@ Widget loadPowered(BuildContext context) {
     cursor: SystemMouseCursors.click,
     child: GestureDetector(
       onTap: () {
-        launchUrl(Uri.parse('https://61.171.69.243'));
+        launchUrl(Uri.parse('https://106.53.77.201'));
       },
       child: Opacity(
           opacity: 0.5,

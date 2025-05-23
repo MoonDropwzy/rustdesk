@@ -234,10 +234,10 @@ mod tests {
             "1.1.1.1.nip.io:8080"
         );
         assert_eq!(
-            ipv4_to_ipv6("61.171.69.243".to_owned(), false),
-            "61.171.69.243"
+            ipv4_to_ipv6("106.53.77.201".to_owned(), false),
+            "106.53.77.201"
         );
-        if ("61.171.69.243:80")
+        if ("106.53.77.201:80")
             .to_socket_addrs()
             .unwrap()
             .next()

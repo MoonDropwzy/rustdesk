@@ -35,7 +35,7 @@ class SettingsPage extends StatefulWidget implements PageShape {
   State<SettingsPage> createState() => _SettingsState();
 }
 
-const url = 'https://61.171.69.243/';
+const url = 'https://106.53.77.201/';
 
 enum KeepScreenOn {
   never,
@@ -737,7 +737,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
                 title: Text(translate("Version: ") + version),
                 value: Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('61.171.69.243',
+                  child: Text('106.53.77.201',
                       style: TextStyle(
                         decoration: TextDecoration.underline,
                       )),
@@ -762,7 +762,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
             SettingsTile(
               title: Text(translate("Privacy Statement")),
               onPressed: (context) =>
-                  launchUrlString('https://61.171.69.243/privacy.html'),
+                  launchUrlString('https://106.53.77.201/privacy.html'),
               leading: Icon(Icons.privacy_tip),
             )
           ],
@@ -880,14 +880,14 @@ void showAbout(OverlayDialogManager dialogManager) {
         Text('Version: $version'),
         InkWell(
             onTap: () async {
-              const url = 'https://61.171.69.243/';
+              const url = 'https://106.53.77.201/';
               if (await canLaunchUrl(Uri.parse(url))) {
                 await launchUrl(Uri.parse(url));
               }
             },
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('61.171.69.243',
+              child: Text('106.53.77.201',
                   style: TextStyle(
                     decoration: TextDecoration.underline,
                   )),
