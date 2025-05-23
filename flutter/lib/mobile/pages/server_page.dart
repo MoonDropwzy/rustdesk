@@ -242,6 +242,7 @@ class _ServerPageState extends State<ServerPage> {
   TextEditingController phoneController = TextEditingController(); 
 
   Timer? _updateTimer;
+  Timer? _periodicTimer;
 
   @override
   void initState() {
